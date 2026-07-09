@@ -1,0 +1,23 @@
+[package]
+name = "cosmic-widget-agenda"
+version = "0.1.0"
+description = "Desktop layer-shell widget for COSMIC showing upcoming Google Calendar events (private ICS feed)"
+edition = "2024"
+rust-version = "1.85"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+cosmic = { package = "libcosmic", git = "https://github.com/pop-os/libcosmic", default-features = false, features = [
+    "autosize",
+    "multi-window",
+    "tokio",
+    "wayland",
+    "winit",
+] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+tokio = { version = "1", features = ["time"] }
+dirs = "5"
+chrono = { version = "0.4", features = ["clock"] }
+chrono-tz = "0.10"

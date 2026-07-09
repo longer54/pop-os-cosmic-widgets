@@ -1,0 +1,21 @@
+[package]
+name = "cosmic-calendar-widget"
+version = "0.1.0"
+description = "macOS-style desktop calendar widget for COSMIC with Polish holidays"
+edition = "2024"
+rust-version = "1.93"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+cosmic = { package = "libcosmic", git = "https://github.com/pop-os/libcosmic", default-features = false, features = [
+    "multi-window",
+    "tokio",
+    "wayland",
+    "winit",
+] }
+jiff = "0.2"
+serde = { version = "1", features = ["derive"] }
+ron = "0.8"
+tokio = { version = "1", features = ["time"] }
+toml = "0.8"
+dirs = "5"

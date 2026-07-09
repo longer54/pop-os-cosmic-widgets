@@ -1,0 +1,20 @@
+// Polish holidays data (reference file)
+// Static representation — actual logic is in src/holidays.rs (Easter algorithm).
+// This file documents the holidays for verification purposes.
+//
+// Fixed dates:
+//   01.01 – Nowy Rok
+//   06.01 – Święto Trzech Króli
+//   01.05 – Święto Pracy
+//   03.05 – Święto Konstytucji 3 Maja
+//   15.08 – Wniebowzięcie NMP
+//   01.11 – Wszystkich Świętych
+//   11.11 – Narodowe Święto Niepodległości
+//   25.12 – Boże Narodzenie (1. dzień)
+//   26.12 – Boże Narodzenie (2. dzień)
+//
+// Movable (Easter-based):
+//   Wielkanoc (Easter Sunday)
+//   Poniedziałek Wielkanocny = Easter + 1
+//   Zielone Świątki = Easter + 49
+//   Boże Ciało = Easter + 60

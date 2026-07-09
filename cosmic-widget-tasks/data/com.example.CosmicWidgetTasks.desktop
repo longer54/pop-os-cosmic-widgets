@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Widget zaległych zadań (Obsidian Tasks)
+Comment=Layer-shell widget z zaległymi/dzisiejszymi zadaniami z vaulta Obsidian
+Exec=cosmic-widget-tasks
+Terminal=false
+Categories=Utility;
+Keywords=COSMIC;obsidian;tasks;zadania;widget;widżet;pulpit;
+Icon=checkbox-checked-symbolic
+StartupNotify=false
+NoDisplay=false
