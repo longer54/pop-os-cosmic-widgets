@@ -1,0 +1,13 @@
+[Desktop Entry]
+Name=COSMIC Calendar Widget
+Name[pl]=Widżet Kalendarza COSMIC
+Comment=macOS-style desktop calendar widget
+Comment[pl]=Kalendarz na pulpicie w stylu macOS
+Type=Application
+Exec=cosmic-calendar-widget
+Terminal=false
+Categories=Utility;
+Keywords=COSMIC;calendar;kalendarz;widget;widżet;pulpit;
+Icon=calendar-symbolic
+StartupNotify=false
+NoDisplay=false

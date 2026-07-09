@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Widget harmonogramu (Kalendarz Google)
+Comment=Layer-shell widget z najbliższymi wydarzeniami z Kalendarza Google
+Exec=cosmic-widget-agenda
+Terminal=false
+Categories=Utility;
+Keywords=COSMIC;calendar;kalendarz;agenda;harmonogram;widget;widżet;pulpit;
+Icon=x-office-calendar-symbolic
+StartupNotify=false
+NoDisplay=false
