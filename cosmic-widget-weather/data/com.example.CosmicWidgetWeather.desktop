@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Widget pogody (Lublin)
+Comment=Layer-shell widget z aktualną pogodą ze stacji IMGW Lublin i krótką prognozą
+Exec=cosmic-widget-weather
+Terminal=false
+Categories=Utility;
+Keywords=COSMIC;weather;pogoda;lublin;widget;widżet;pulpit;
+Icon=weather-clear-symbolic
+StartupNotify=false
+NoDisplay=false

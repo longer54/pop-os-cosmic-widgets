@@ -1,6 +1,6 @@
 # Pop!_OS COSMIC Desktop Widgets
 
-Four lightweight desktop widgets for the [COSMIC desktop](https://github.com/pop-os/cosmic-epoch) (Pop!_OS), written in Rust with [libcosmic](https://github.com/pop-os/libcosmic)/iced. Each widget is a standalone binary that pins itself to a corner of the screen via Wayland's layer-shell protocol and refreshes its content on a timer — no panel applet API required.
+Five lightweight desktop widgets for the [COSMIC desktop](https://github.com/pop-os/cosmic-epoch) (Pop!_OS), written in Rust with [libcosmic](https://github.com/pop-os/libcosmic)/iced. Each widget is a standalone binary that pins itself to a corner of the screen via Wayland's layer-shell protocol and refreshes its content on a timer — no panel applet API required.
 
 ## Widgets
 
@@ -10,6 +10,7 @@ Four lightweight desktop widgets for the [COSMIC desktop](https://github.com/pop
 | [`cosmic-calendar-widget`](cosmic-calendar-widget/) | Obsidian daily-notes calendar (click a day to open/create its note) | Local Obsidian vault files |
 | [`cosmic-widget-agenda`](cosmic-widget-agenda/) | Upcoming events from a Google Calendar | Private ICS feed (no OAuth) |
 | [`cosmic-widget-tasks`](cosmic-widget-tasks/) | Overdue / due-today tasks (Obsidian [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) plugin syntax) | Local Obsidian vault files |
+| [`cosmic-widget-weather`](cosmic-widget-weather/) | Current weather (defaults to Lublin, PL) + short forecast | Public IMGW station feed + Open-Meteo |
 
 Each widget has its own README with config details and setup steps.
 
@@ -17,7 +18,7 @@ Each widget has its own README with config details and setup steps.
 
 - **Layer-shell surface** (`Layer::Bottom`: above the wallpaper, below windows, visible on every workspace), anchored to a screen corner and offset by a configurable margin — position is deterministic across restarts.
 - **Explicit size + resize on refresh.** Free-floating layer-shell surfaces don't auto-size to their content the way panel applets do; every widget computes an estimated height from its current content and calls `set_size` after each data refresh.
-- **Glass-style card UI** — dark, semi-transparent rounded card, consistent across all four widgets.
+- **Glass-style card UI** — dark, semi-transparent rounded card, consistent across all five widgets.
 - **Config file** at `~/.config/<widget-name>/config.toml`, auto-created with placeholder defaults on first run — edit it, then restart the widget.
 - **Autostart** via a `.desktop` file you copy into `~/.config/autostart/`.
 
