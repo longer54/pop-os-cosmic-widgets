@@ -1,0 +1,53 @@
+[package]
+name = "cosmic-quicklook"
+version = "0.1.0"
+description = "Quick Look dla COSMIC — spacja pokazuje podgląd zaznaczonego pliku (obraz, PDF, tekst, wideo) w lekkim oknie nad wszystkim"
+edition = "2024"
+rust-version = "1.85"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+cosmic = { package = "libcosmic", git = "https://github.com/pop-os/libcosmic", default-features = false, features = [
+    "autosize",
+    "multi-window",
+    "tokio",
+    "wayland",
+    "winit",
+] }
+cosmic-widget-common = { path = "../cosmic-widget-common" }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+# `net` + `io-util`: gniazdo uniksowe demona (jak w cosmic-widget-drawer)
+tokio = { version = "1", features = ["time", "macros", "net", "io-util", "process"] }
+dirs = "5"
+chrono = { version = "0.4", features = ["clock"] }
+
+# --- skąd wziąć ścieżkę zaznaczonego pliku (src/selection.rs) ---
+# Menedżer plików nie ma API do zaznaczenia, więc udajemy Ctrl+C wirtualną
+# klawiaturą Waylanda i czytamy `text/uri-list` ze schowka. Wymaga trzech
+# protokołów: virtual-keyboard (wysłanie klawisza), ext-foreign-toplevel-list
+# + cosmic-toplevel-info (sprawdzenie, CZY na wierzchu jest menedżer plików —
+# żeby nie posłać Ctrl+C do terminala, gdzie to SIGINT).
+wayland-client = "0.31"
+wayland-protocols = { version = "0.32", features = ["client", "staging"] }
+wayland-protocols-misc = { version = "0.3", features = ["client"] }
+cosmic-protocols = { git = "https://github.com/pop-os/cosmic-protocols", rev = "32283d7", default-features = false, features = [
+    "client",
+] }
+tempfile = "3"
+
+# Dekodowanie obrazów do podglądu. libcosmic umie z pliku tylko png/jpeg/ico,
+# a my i tak musimy zmniejszyć obraz do rozmiaru karty (inaczej 8000×6000 px
+# ląduje w teksturze GPU).
+image = { version = "0.25", default-features = false, features = [
+    "bmp",
+    "gif",
+    "ico",
+    "jpeg",
+    "png",
+    "pnm",
+    "qoi",
+    "tga",
+    "tiff",
+    "webp",
+] }

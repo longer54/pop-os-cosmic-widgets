@@ -53,8 +53,9 @@ impl CalendarState {
 /// Messages the widget can handle.
 #[derive(Debug, Clone)]
 pub enum Message {
-    /// Day cell clicked: select it, ensure its Obsidian daily note exists,
-    /// and open it in Obsidian.
+    /// Day cell clicked: select it, ensure its daily note exists, and open
+    /// it — in Obsidian or directly as a `.md` file, depending on the
+    /// `open_in_obsidian` toggle.
     SelectDate(Date),
     PrevMonth,
     NextMonth,
@@ -62,4 +63,18 @@ pub enum Message {
     /// Periodic refresh of the note-dot cache, to pick up edits made
     /// directly in Obsidian while the widget stays open.
     Tick,
+    /// Persistent toggle: `true` = day clicks open Obsidian, `false` = day
+    /// clicks open the `.md` file directly. Saved back to config.toml.
+    ToggleOpenMode(bool),
+    /// Uchwyt ⠿ wciśnięty — start przeciągania widgetu.
+    DragStart,
+    /// Event myszy podczas przeciągania (cosmic-widget-common).
+    Drag(cosmic_widget_common::DragEvent),
+    /// Tick stacku — dopasuj pozycję do widgetu-rodzica.
+    StackTick,
+    /// Zmiana pulpitu wirtualnego w KWin: `true` = jesteśmy na „swoim"
+    /// pulpicie (pokaż powierzchnię), `false` = na innym (schowaj).
+    DesktopVisible(bool),
+    /// Nowy poziom oszklenia — użytkownik ruszył suwakiem przezroczystości doka.
+    Glass(cosmic_widget_common::Glass),
 }

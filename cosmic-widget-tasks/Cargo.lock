@@ -998,10 +998,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "cosmic-widget-common"
+version = "0.1.0"
+dependencies = [
+ "dirs 5.0.1",
+ "libcosmic",
+ "serde",
+ "tokio",
+ "toml 0.8.23",
+ "zbus",
+]
+
+[[package]]
 name = "cosmic-widget-tasks"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "cosmic-widget-common",
  "dirs 5.0.1",
  "libcosmic",
  "serde",

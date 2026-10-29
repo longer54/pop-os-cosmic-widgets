@@ -1,0 +1,15 @@
+[package]
+name = "cosmic-tray-reset"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "cosmic-tray-reset"
+path = "src/main.rs"
+
+[dependencies]
+ksni = "0.3"
+tokio = { version = "1", features = ["rt", "macros", "time"] }
+
+[profile.release]
+opt-level = 2

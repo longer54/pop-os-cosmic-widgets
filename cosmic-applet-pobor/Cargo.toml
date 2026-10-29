@@ -1,0 +1,21 @@
+[package]
+name = "cosmic-applet-pobor"
+version = "0.1.0"
+edition = "2021"
+description = "Aplet panelu COSMIC: pobor pradu calego laptopa teraz i srednie z kilku godzin"
+
+[[bin]]
+name = "cosmic-applet-pobor"
+path = "src/main.rs"
+
+# Ta sama przypieta rewizja co cosmic-applet-nocny-filtr (API popupu).
+[dependencies]
+cosmic = { package = "libcosmic", git = "https://github.com/pop-os/libcosmic", rev = "74b2407342de7de1d9093a7dce34e4f58e6b53cd", default-features = false, features = [
+    "applet",
+    "tokio",
+    "wayland",
+] }
+chrono = "0.4"
+
+[profile.release]
+opt-level = 2

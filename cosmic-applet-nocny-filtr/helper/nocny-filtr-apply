@@ -1,0 +1,83 @@
+#!/bin/sh
+# nocny-filtr-apply — pomocnik roota dla apletu nocnego filtra.
+#
+# Robi dwie rzeczy, na ktore aplet (zwykly user) nie ma prawa:
+#   1. zapisuje NIGHT_TEMP w /etc/default/drm-colortemp.conf,
+#   2. przelacza konsole tam i z powrotem, zeby demon drm-colortemp zdazyl
+#      naniesc gamme, gdy COSMIC na moment puszcza ekran (stad mignięcie).
+#
+# Uzycie:
+#   nocny-filtr-apply <2500..6500>   ustaw te temperature i wlacz filtr teraz
+#   nocny-filtr-apply off            zdejmij filtr (temperatura dzienna)
+#   nocny-filtr-apply auto           oddaj sterowanie harmonogramowi godzinowemu
+#
+# Uruchamiany przez sudo z regula NOPASSWD ograniczona do dokladnie tych
+# wartosci (patrz install-root.sh). Kazdy argument jest tu walidowany
+# ponownie — regula sudoers to nie jedyna linia obrony.
+
+set -eu
+
+TRYB="${1:-}"
+CONF=/etc/default/drm-colortemp.conf
+CHVT=/usr/bin/chvt
+FGCONSOLE=/usr/bin/fgconsole
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "musi dzialac jako root (przez sudo)" >&2
+    exit 1
+fi
+
+if ! systemctl is-active --quiet drm-colortemp.service; then
+    echo "demon drm-colortemp nie dziala: sudo systemctl enable --now drm-colortemp" >&2
+    exit 1
+fi
+
+# Czyta liczbowa wartosc z configu; celowo NIE zrodluje pliku.
+get_conf() {
+    val=$(sed -n "s/^[[:space:]]*$1=[\"']\{0,1\}\([0-9]\{1,\}\)[\"']\{0,1\}.*/\1/p" "$CONF" | head -1)
+    [ -n "$val" ] && printf '%s' "$val"
+}
+
+MONITOR_TTY="$(get_conf MONITOR_TTY || true)"; MONITOR_TTY="${MONITOR_TTY:-3}"
+WARM_TTY="$(get_conf WARM_TTY || true)";       WARM_TTY="${WARM_TTY:-4}"
+COOL_TTY="$(get_conf COOL_TTY || true)";       COOL_TTY="${COOL_TTY:-5}"
+
+case "$TRYB" in
+    auto) CEL="$MONITOR_TTY" ;;
+    off)  CEL="$COOL_TTY" ;;
+    ''|*[!0-9]*)
+        echo "uzycie: nocny-filtr-apply {<2500..6500>|off|auto}" >&2
+        exit 2 ;;
+    *)
+        if [ "$TRYB" -lt 2500 ] || [ "$TRYB" -gt 6500 ]; then
+            echo "temperatura poza zakresem 2500-6500" >&2
+            exit 2
+        fi
+        # Podmiana samej liczby w istniejacej linii; zapis atomowy, bo demon
+        # obserwuje ten katalog przez inotify.
+        TMP="$(mktemp /etc/default/.nocny-filtr.XXXXXX)"
+        sed "s/^[[:space:]]*NIGHT_TEMP=.*/NIGHT_TEMP=$TRYB/" "$CONF" > "$TMP"
+        chmod 644 "$TMP"
+        mv "$TMP" "$CONF"
+        CEL="$WARM_TTY"
+        # Chwila na przeladowanie configu przez demona (inotify + settle).
+        sleep 0.4
+        ;;
+esac
+
+# Walidacja numeru konsoli — do chvt trafia tylko mala liczba calkowita.
+case "$CEL" in ''|*[!0-9]*) echo "zly numer TTY" >&2; exit 1 ;; esac
+[ "$CEL" -ge 1 ] && [ "$CEL" -le 12 ] || { echo "numer TTY poza 1-12" >&2; exit 1; }
+
+OBECNY="$("$FGCONSOLE")"
+if [ "$OBECNY" = "$CEL" ]; then
+    echo "juz jestesmy na TTY $CEL" >&2
+    exit 1
+fi
+
+"$CHVT" "$CEL"
+# Wracamy nawet gdyby cos przerwalo skrypt w polowie — inaczej użytkownik zostaje
+# na czarnej konsoli tekstowej.
+trap '"$CHVT" "$OBECNY" 2>/dev/null || true' EXIT INT TERM
+sleep 1.2
+"$CHVT" "$OBECNY"

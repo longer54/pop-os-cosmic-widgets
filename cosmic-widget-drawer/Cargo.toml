@@ -1,0 +1,27 @@
+[package]
+name = "cosmic-widget-drawer"
+version = "0.1.0"
+description = "Centrum powiadomień dla COSMIC — szuflada wysuwana od prawej krawędzi z treścią widgetów pulpitowych (pogoda, harmonogram, zadania, kursy)"
+edition = "2024"
+rust-version = "1.85"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+cosmic = { package = "libcosmic", git = "https://github.com/pop-os/libcosmic", default-features = false, features = [
+    "autosize",
+    "multi-window",
+    "tokio",
+    "wayland",
+    "winit",
+] }
+cosmic-widget-common = { path = "../cosmic-widget-common" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+# `net` + `io-util` dodatkowo względem innych widgetów: gniazdo uniksowe,
+# przez które skrót klawiszowy mówi działającemu demonowi „pokaż/schowaj”.
+tokio = { version = "1", features = ["time", "macros", "net", "io-util"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+dirs = "5"
+chrono = { version = "0.4", features = ["clock"] }
+chrono-tz = "0.10"

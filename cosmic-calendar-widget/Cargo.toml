@@ -13,6 +13,7 @@ cosmic = { package = "libcosmic", git = "https://github.com/pop-os/libcosmic", d
     "wayland",
     "winit",
 ] }
+cosmic-widget-common = { path = "../cosmic-widget-common" }
 jiff = "0.2"
 serde = { version = "1", features = ["derive"] }
 ron = "0.8"

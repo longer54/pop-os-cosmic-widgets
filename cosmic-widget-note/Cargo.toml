@@ -1,0 +1,23 @@
+[package]
+name = "cosmic-widget-note"
+version = "0.1.0"
+description = "Widget pulpitowy COSMIC: jedna ogólna notatka z vaulta Obsidian, pisana wprost na pulpicie"
+edition = "2024"
+rust-version = "1.93"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+cosmic = { package = "libcosmic", git = "https://github.com/pop-os/libcosmic", default-features = false, features = [
+    "multi-window",
+    "tokio",
+    "wayland",
+    "winit",
+] }
+cosmic-widget-common = { path = "../cosmic-widget-common" }
+jiff = "0.2"
+serde = { version = "1", features = ["derive"] }
+# `net` + `io-util`: gniazdo, przez które skrót Super+Shift+N mówi
+# działającemu widgetowi „nowa notatka" (wzór z cosmic-widget-drawer).
+tokio = { version = "1", features = ["time", "net", "io-util"] }
+toml = "0.8"
+dirs = "5"

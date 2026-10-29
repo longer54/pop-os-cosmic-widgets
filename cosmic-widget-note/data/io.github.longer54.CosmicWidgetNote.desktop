@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Widżet Notatki (Obsidian)
+Comment=Kartka na pulpicie — jedna ogólna notatka .md z vaulta Obsidian, edytowalna na miejscu
+Exec=cosmic-widget-note
+Terminal=false
+Categories=Utility;
+Keywords=COSMIC;obsidian;notatka;notes;widget;widżet;pulpit;
+Icon=accessories-text-editor-symbolic
+StartupNotify=false
+NoDisplay=false

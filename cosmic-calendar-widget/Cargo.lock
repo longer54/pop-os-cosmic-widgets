@@ -867,6 +867,7 @@ dependencies = [
 name = "cosmic-calendar-widget"
 version = "0.1.0"
 dependencies = [
+ "cosmic-widget-common",
  "dirs 5.0.1",
  "jiff",
  "libcosmic",
@@ -995,6 +996,18 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "cosmic-widget-common"
+version = "0.1.0"
+dependencies = [
+ "dirs 5.0.1",
+ "libcosmic",
+ "serde",
+ "tokio",
+ "toml 0.8.23",
+ "zbus",
 ]
 
 [[package]]
