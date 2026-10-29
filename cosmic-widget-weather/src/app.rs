@@ -7,17 +7,17 @@ use std::time::Duration as StdDuration;
 
 use chrono::{Datelike, Duration as ChronoDuration, Local, NaiveDate};
 use cosmic::app::{Core, Task};
-use cosmic::iced::border::Border;
 use cosmic::iced::platform_specific::runtime::wayland::layer_surface::{
     IcedMargin, SctkLayerSurfaceSettings,
 };
 use cosmic::iced::platform_specific::shell::commands::layer_surface::{
-    get_layer_surface, set_size, Anchor, KeyboardInteractivity, Layer,
+    destroy_layer_surface, get_layer_surface, set_margin, set_size, Anchor, KeyboardInteractivity, Layer,
 };
 use cosmic::iced::window;
-use cosmic::iced::{Background, Color, Length, Shadow, Subscription, Vector};
+use cosmic::iced::{Color, Length, Subscription};
 use cosmic::widget::{container, mouse_area, text};
 use cosmic::Element;
+use cosmic_widget_common::{desktop, drag, glass, Glass, Outcome, WidgetPos};
 
 use crate::config::Config;
 use crate::weather::{fetch_weather, wind_compass, wmo_desc, WeatherData};
@@ -29,15 +29,28 @@ pub enum Message {
     Tick,
     Fetched(Result<WeatherData, String>),
     OpenWeather,
+    DragStart,
+    Drag(drag::DragEvent),
+    StackTick,
+    /// Zmiana pulpitu wirtualnego w KWin: `true` = jesteśmy na „swoim"
+    /// pulpicie (pokaż powierzchnię), `false` = na innym (schowaj).
+    DesktopVisible(bool),
+    /// Nowy poziom oszklenia — użytkownik ruszył suwakiem przezroczystości doka.
+    Glass(Glass),
 }
 
 pub struct Widget {
     core: Core,
     surface_id: window::Id,
     config: Config,
+    pos: WidgetPos,
+    /// Szkło karty: przezroczystość + region rozmycia tła.
+    glass: Glass,
     data: Option<WeatherData>,
     last_error: Option<String>,
-    last_update: Option<String>,
+    /// Czy powierzchnia layer-shell istnieje w tej chwili. `false` = jesteśmy
+    /// na innym pulpicie wirtualnym i widget jest schowany.
+    visible: bool,
 }
 
 fn anchor_from_str(s: &str) -> Anchor {
@@ -49,8 +62,37 @@ fn anchor_from_str(s: &str) -> Anchor {
     }
 }
 
-fn now_hhmm() -> String {
-    Local::now().format("%H:%M").to_string()
+/// Ustawienia powierzchni layer-shell. Wydzielone, bo widget odtwarza ją po
+/// powrocie na swój pulpit wirtualny (`Message::DesktopVisible`), a nie
+/// tylko raz przy starcie.
+fn surface_settings(
+    id: window::Id,
+    anchor: &str,
+    margin_x: i32,
+    margin_y: i32,
+    width: u32,
+    height: u32,
+) -> SctkLayerSurfaceSettings {
+    SctkLayerSurfaceSettings {
+        id,
+        // NIE zmieniać na Layer::Background (sprawdzone 2026-08-11): klik w
+        // tapetę podnosi okno pulpitu plasmashella nad tamtą warstwę i widget
+        // znika z ekranu. Pokazywaniem się na innych pulpitach zajmuje się
+        // `desktop::subscription`, nie warstwa.
+        layer: Layer::Bottom,
+        keyboard_interactivity: KeyboardInteractivity::None,
+        anchor: anchor_from_str(anchor),
+        margin: IcedMargin {
+            top: margin_y,
+            right: margin_x,
+            bottom: margin_y,
+            left: margin_x,
+        },
+        size: Some((Some(width), Some(height))),
+        exclusive_zone: 0,
+        namespace: "cosmic-widget-weather".into(),
+        ..Default::default()
+    }
 }
 
 fn day_label(d: NaiveDate) -> String {
@@ -98,8 +140,51 @@ impl Widget {
         h.clamp(90, 900)
     }
 
-    fn resize_task(&self) -> Task<Message> {
-        set_size(self.surface_id, Some(self.config.width), Some(self.estimated_height()))
+    fn resize_task(&mut self) -> Task<Message> {
+        let h = self.estimated_height();
+        self.pos.set_height(h);
+        Task::batch([
+            set_size(self.surface_id, Some(self.config.width), Some(h)),
+            self.blur_task(),
+        ])
+    }
+
+    /// Region rozmycia tła pod kartą. Kompozytor gubi go razem z
+    /// powierzchnią, więc wołamy to po każdym utworzeniu powierzchni i po
+    /// każdej zmianie jej rozmiaru.
+    fn blur_task(&self) -> Task<Message> {
+        glass::blur_task_single(
+            self.surface_id,
+            self.glass,
+            self.config.width,
+            self.estimated_height(),
+        )
+    }
+
+    /// Zastosuj aktualną pozycję z `self.pos` na powierzchni.
+    fn margin_task(&self) -> Task<Message> {
+        set_margin(
+            self.surface_id,
+            self.pos.margin_y(),
+            self.pos.margin_x(),
+            self.pos.margin_y(),
+            self.pos.margin_x(),
+        )
+    }
+
+    /// Koniec przeciągania: utrwal nową pozycję w configu.
+    fn save_position(&mut self) {
+        self.config.margin_x = self.pos.margin_x();
+        // `margin_y` zapisujemy ZAWSZE, także w stacku: to jedyna kopia
+        // pozycji, która przeżyje wyczyszczenie `~/.cache`. Wcześniej
+        // stackowany widget zapisywał wyłącznie `stack_offset_y`, więc
+        // `margin_y` w configu zostawał skamieliną sprzed miesięcy.
+        self.config.margin_y = self.pos.margin_y();
+        if self.pos.is_stacked() {
+            self.config.stack_offset_y = self.pos.stack_offset_y();
+        }
+        self.config.save();
+        self.pos.publish();
     }
 }
 
@@ -107,7 +192,7 @@ impl cosmic::Application for Widget {
     type Executor = cosmic::executor::Default;
     type Flags = Config;
     type Message = Message;
-    const APP_ID: &'static str = "com.example.CosmicWidgetWeather";
+    const APP_ID: &'static str = "io.github.longer54.CosmicWidgetWeather";
 
     fn core(&self) -> &Core {
         &self.core
@@ -119,44 +204,76 @@ impl cosmic::Application for Widget {
 
     fn init(mut core: Core, config: Config) -> (Self, Task<Message>) {
         core.window.show_headerbar = false;
+        // Automatyczny blur libcosmica bierze CAŁY prostokąt powierzchni
+        // layer-shell — szkło wypełniłoby też przezroczyste szpary między
+        // kartami i kwadratowe rogi poza zaokrągleniem. Pusty zestaw = nie
+        // proś kompozytora o blur automatycznie; region podajemy sami,
+        // dokładnie pod kartami (`glass::blur_task`).
+        core.set_auto_blur(Default::default());
 
         let surface_id = window::Id::unique();
-        let anchor = anchor_from_str(&config.anchor);
-        let margin = IcedMargin {
-            top: config.margin_y,
-            right: config.margin_x,
-            bottom: config.margin_y,
-            left: config.margin_x,
-        };
+        // Powierzchnia POWSTAJE PO `WidgetPos` i z jego marginesów, nie
+        // z surowego configu — patrz `WidgetPos::new` (config bywa
+        // nieświeży, prawdziwą pozycję zna opublikowana geometria).
+        let pos = WidgetPos::new(
+            "weather",
+            &config.anchor,
+            config.margin_x,
+            config.margin_y,
+            config.width,
+            Some(config.stack_below.clone()),
+            config.stack_gap,
+            config.stack_offset_y,
+        );
+        pos.publish();
 
-        let surface_task = get_layer_surface(SctkLayerSurfaceSettings {
-            id: surface_id,
-            layer: Layer::Bottom,
-            keyboard_interactivity: KeyboardInteractivity::None,
-            anchor,
-            margin,
-            size: Some((Some(config.width), Some(160))),
-            exclusive_zone: 0,
-            namespace: "cosmic-widget-weather".into(),
-            ..Default::default()
-        });
+        let surface_task = get_layer_surface(surface_settings(
+            surface_id,
+            &config.anchor,
+            pos.margin_x(),
+            pos.margin_y(),
+            config.width,
+            160,
+        ));
+
+        let glass = Glass::from_config(&config.glass);
 
         let widget = Widget {
             core,
             surface_id,
             config,
+            pos,
+            glass,
             data: None,
             last_error: None,
-            last_update: None,
+            visible: true,
         };
 
         let fetch = widget.fetch_task();
-        (widget, Task::batch([surface_task, fetch]))
+        let blur = widget.blur_task();
+        (widget, Task::batch([surface_task, blur, fetch]))
     }
 
     fn subscription(&self) -> Subscription<Message> {
         let secs = self.config.refresh_secs.max(60);
-        cosmic::iced::time::every(StdDuration::from_secs(secs)).map(|_| Message::Tick)
+        let mut subs =
+            vec![cosmic::iced::time::every(StdDuration::from_secs(secs)).map(|_| Message::Tick)];
+        if self.pos.dragging() {
+            subs.push(drag::subscription().map(Message::Drag));
+        }
+        // Schowany widget nie ma powierzchni, więc nie ma czego przesuwać.
+        if self.pos.is_stacked() && self.visible {
+            subs.push(
+                self.pos.stack_subscription().map(|()| Message::StackTick),
+            );
+        }
+        subs.push(glass::subscription(self.glass.level()).map(Message::Glass));
+        if self.config.only_on_desktop > 0 {
+            subs.push(
+                desktop::subscription(self.config.only_on_desktop).map(Message::DesktopVisible),
+            );
+        }
+        Subscription::batch(subs)
     }
 
     fn view(&self) -> Element<'_, Message> {
@@ -176,7 +293,6 @@ impl cosmic::Application for Widget {
             Message::Fetched(Ok(data)) => {
                 self.data = Some(data);
                 self.last_error = None;
-                self.last_update = Some(now_hhmm());
                 self.resize_task()
             }
             Message::Fetched(Err(e)) => {
@@ -188,6 +304,55 @@ impl cosmic::Application for Widget {
                     .arg(&self.config.weather_url)
                     .spawn();
                 Task::none()
+            }
+            Message::DragStart => {
+                self.pos.start_drag();
+                Task::none()
+            }
+            Message::Drag(ev) => match self.pos.on_event(&ev, self.surface_id) {
+                Outcome::Moved => self.margin_task(),
+                Outcome::Released => {
+                    self.save_position();
+                    self.margin_task()
+                }
+                Outcome::None => Task::none(),
+            },
+            Message::Glass(g) => {
+                self.glass = g;
+                self.blur_task()
+            }
+            Message::StackTick => {
+                if self.pos.stack_tick() {
+                    self.pos.publish();
+                    self.margin_task()
+                } else {
+                    Task::none()
+                }
+            }
+            // Zejście na inny pulpit = zniszcz powierzchnię (KWin nie umie
+            // przypiąć layer-shella do pulpitu); powrót = odtwórz ją z
+            // aktualną pozycją i wysokością.
+            Message::DesktopVisible(show) => {
+                if show == self.visible {
+                    return Task::none();
+                }
+                self.visible = show;
+                if show {
+                    self.surface_id = window::Id::unique();
+                    Task::batch([
+                        get_layer_surface(surface_settings(
+                            self.surface_id,
+                            &self.config.anchor,
+                            self.pos.margin_x(),
+                            self.pos.margin_y(),
+                            self.config.width,
+                            self.estimated_height(),
+                        )),
+                        self.blur_task(),
+                    ])
+                } else {
+                    destroy_layer_surface(self.surface_id)
+                }
             }
         }
     }
@@ -222,11 +387,10 @@ impl Widget {
         let mut rows: Vec<Element<'_, Message>> = Vec::new();
 
         // ---- Nagłówek ----
-        let mut header_items: Vec<Element<'_, Message>> =
-            vec![text::heading("Pogoda — Lublin").width(Length::Fill).into()];
-        if let Some(ts) = &self.last_update {
-            header_items.push(text::caption(ts.clone()).class(dim_text()).into());
-        }
+        let header_items: Vec<Element<'_, Message>> = vec![
+            drag::handle(Message::DragStart),
+            text::heading("Pogoda — Lublin").width(Length::Fill).into(),
+        ];
         rows.push(
             cosmic::widget::row::with_children(header_items)
                 .spacing(8)
@@ -310,29 +474,15 @@ impl Widget {
 
         let card = container(content)
             .padding([12, 14])
-            .class(cosmic::theme::Container::custom(glass_style))
-            .width(Length::Fixed(width));
+            .class(cosmic::theme::Container::custom(self.glass.container()))
+            .width(Length::Fixed(width))
+            // Wysokość JAWNA, taka sama jak wysokość powierzchni i regionu
+            // rozmycia (`estimated_height`). Bez tego karta kurczy się do
+            // treści, a szkło — liczone z wysokości powierzchni — wystaje
+            // spod niej rozmytym paskiem.
+            .height(Length::Fixed(self.estimated_height() as f32));
 
         mouse_area(card).on_press(Message::OpenWeather).into()
     }
 }
 
-/// Ciemna półprzezroczysta karta w stylu szkła — jak w pozostałych widgetach.
-fn glass_style(_theme: &cosmic::Theme) -> cosmic::iced::widget::container::Style {
-    cosmic::iced::widget::container::Style {
-        icon_color: Some(Color::from_rgb(0.95, 0.95, 0.97)),
-        text_color: Some(Color::from_rgb(0.95, 0.95, 0.97)),
-        background: Some(Background::Color(Color::from_rgba(0.08, 0.08, 0.1, 0.55))),
-        border: Border {
-            color: Color::from_rgba(1.0, 1.0, 1.0, 0.14),
-            width: 1.0,
-            radius: 18.0.into(),
-        },
-        shadow: Shadow {
-            color: Color::from_rgba(0.0, 0.0, 0.0, 0.35),
-            offset: Vector::new(0.0, 6.0),
-            blur_radius: 24.0,
-        },
-        snap: true,
-    }
-}

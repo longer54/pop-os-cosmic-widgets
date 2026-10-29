@@ -1,0 +1,53 @@
+diff --git a/src/shell/element/mod.rs b/src/shell/element/mod.rs
+index d4743b7..6b7dec7 100644
+--- a/src/shell/element/mod.rs
++++ b/src/shell/element/mod.rs
+@@ -197,6 +197,20 @@ impl Hash for CosmicMapped {
+ }
+ 
+ impl CosmicMapped {
++    /// Okna bez zoltej ramki aktywnego okna (active hint) - łatka "bez-ramki".
++    /// Lista app_id w ~/.config/cosmic-bez-ramki (po jednym w linii), domyslnie pusta.
++    pub fn bez_ramki(&self) -> bool {
++        static LISTA: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
++        let lista = LISTA.get_or_init(|| {
++            std::env::var_os("HOME")
++                .and_then(|h| std::fs::read_to_string(std::path::Path::new(&h).join(".config/cosmic-bez-ramki")).ok())
++                .map(|t| t.lines().map(|l| l.trim().to_string()).filter(|l| !l.is_empty() && !l.starts_with('#')).collect())
++                .unwrap_or_default()
++        });
++        let app_id = self.active_window().app_id();
++        lista.iter().any(|a| *a == app_id)
++    }
++
+     pub fn windows(&self) -> impl Iterator<Item = (CosmicSurface, Point<i32, Logical>)> + '_ {
+         match &self.element {
+             CosmicMappedInternal::Stack(stack) => {
+diff --git a/src/shell/layout/floating/mod.rs b/src/shell/layout/floating/mod.rs
+index 95d7264..f63c7d8 100644
+--- a/src/shell/layout/floating/mod.rs
++++ b/src/shell/layout/floating/mod.rs
+@@ -1587,7 +1587,7 @@ impl FloatingLayout {
+                 None
+             };
+ 
+-            if focused == Some(elem) && !elem.is_maximized(false) {
++            if focused == Some(elem) && !elem.is_maximized(false) && !elem.bez_ramki() {
+                 let active_window_hint = crate::theme::active_window_hint(theme);
+                 let radius = elem.corner_radius(geometry.size.as_logical(), indicator_thickness);
+ 
+diff --git a/src/shell/layout/tiling/mod.rs b/src/shell/layout/tiling/mod.rs
+index 8706dc5..2c2027e 100644
+--- a/src/shell/layout/tiling/mod.rs
++++ b/src/shell/layout/tiling/mod.rs
+@@ -5462,6 +5462,10 @@ fn render_new_tree_windows<R>(
+         swap_tree,
+         swap_desc.as_ref(),
+         |node_id, data, geo, original_geo, alpha, animating| {
++            let indicator_thickness = match data {
++                Data::Mapped { mapped, .. } if mapped.bez_ramki() => 0,
++                _ => indicator_thickness,
++            };
+             if swap_desc.as_ref().map(|desc| &desc.node) == Some(&node_id)
+                 || focused.as_ref() == Some(&node_id)
+             {

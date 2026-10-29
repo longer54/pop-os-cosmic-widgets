@@ -1,0 +1,26 @@
+[package]
+name = "cosmic-widget-common"
+version = "0.1.0"
+description = "Wspólny kod widgetów pulpitowych COSMIC: przeciąganie myszką + auto-rozsuwanie kolumn"
+edition = "2024"
+rust-version = "1.85"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+# Ten sam git URL co w widgetach — cargo unifikuje z rewizją przypiętą
+# w Cargo.lock danego widgetu (projekty mają różne rewizje libcosmic,
+# używamy tu tylko API wspólnego dla wszystkich).
+cosmic = { package = "libcosmic", git = "https://github.com/pop-os/libcosmic", default-features = false, features = [
+    "autosize",
+    "multi-window",
+    "tokio",
+    "wayland",
+    "winit",
+] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+dirs = "5"
+tokio = { version = "1", features = ["time"] }
+# Nasłuch pulpitów wirtualnych KWin (src/desktop.rs). Wersja jak w libcosmic,
+# więc nie dokłada nowej gałęzi zależności.
+zbus = { version = "5", default-features = false, features = ["tokio"] }

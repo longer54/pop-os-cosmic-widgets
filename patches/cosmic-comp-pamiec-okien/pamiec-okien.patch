@@ -1,0 +1,217 @@
+diff --git a/src/shell/element/mod.rs b/src/shell/element/mod.rs
+index 1473671..91af951 100644
+--- a/src/shell/element/mod.rs
++++ b/src/shell/element/mod.rs
+@@ -104,6 +104,9 @@ pub struct CosmicMapped {
+     //floating
+     pub(super) resize_state: Arc<Mutex<Option<ResizeState>>>,
+     pub last_geometry: Arc<Mutex<Option<Rectangle<i32, Local>>>>,
++    // [patch] app_id zapamiętane przy mapowaniu okna - przy zamykaniu
++    // toplevel bywa już martwy i nie da się go odczytać z surface
++    pub saved_app_id: Arc<Mutex<Option<String>>>,
+     pub moved_since_mapped: Arc<AtomicBool>,
+     pub floating_tiled: Arc<Mutex<Option<TiledCorners>>>,
+     //sticky
+@@ -1073,6 +1076,7 @@ impl From<CosmicWindow> for CosmicMapped {
+             tiling_node_id: Arc::new(Mutex::new(None)),
+             resize_state: Arc::new(Mutex::new(None)),
+             last_geometry: Arc::new(Mutex::new(None)),
++            saved_app_id: Arc::new(Mutex::new(None)),
+             moved_since_mapped: Arc::new(AtomicBool::new(false)),
+             floating_tiled: Arc::new(Mutex::new(None)),
+             previous_layer: Arc::new(Mutex::new(None)),
+@@ -1090,6 +1094,7 @@ impl From<CosmicStack> for CosmicMapped {
+             tiling_node_id: Arc::new(Mutex::new(None)),
+             resize_state: Arc::new(Mutex::new(None)),
+             last_geometry: Arc::new(Mutex::new(None)),
++            saved_app_id: Arc::new(Mutex::new(None)),
+             moved_since_mapped: Arc::new(AtomicBool::new(false)),
+             floating_tiled: Arc::new(Mutex::new(None)),
+             previous_layer: Arc::new(Mutex::new(None)),
+diff --git a/src/shell/layout/floating/mod.rs b/src/shell/layout/floating/mod.rs
+index 95d7264..1001fe7 100644
+--- a/src/shell/layout/floating/mod.rs
++++ b/src/shell/layout/floating/mod.rs
+@@ -423,11 +423,36 @@ impl FloatingLayout {
+         let last_geometry = *mapped.last_geometry.lock().unwrap();
+         let min_size = mapped.min_size().unwrap_or((320, 240).into());
+ 
++        // [patch] pamięć okien między uruchomieniami aplikacji.
++        // app_id zapisujemy w oknie, bo przy zamykaniu toplevel bywa już martwy.
++        let app_id = mapped.active_window().app_id();
++        if !app_id.is_empty() {
++            *mapped.saved_app_id.lock().unwrap() = Some(app_id.clone());
++        }
++        // Zapamiętaną geometrię stosujemy tylko do świeżo mapowanych okien - przy
++        // przenoszeniu między pulpitami itp. obowiązuje last_geometry.
++        let remembered = if size.is_none() && last_geometry.is_none() {
++            crate::utils::window_memory::get(&app_id)
++        } else {
++            None
++        };
++
+         if let Some(size) = size
+             .map(SizeExt::as_local)
+             .or(last_geometry.map(|g| g.size))
+         {
+             win_geo.size = size;
++        } else if let Some(remembered) = remembered {
++            // [patch] rozmiar z poprzedniego uruchomienia - z pominięciem
++            // upstreamowego przycinania nowych okien do 2/3 ekranu
++            win_geo.size.w = remembered
++                .w
++                .max(min_size.w)
++                .min(output_geometry.size.w.max(min_size.w));
++            win_geo.size.h = remembered
++                .h
++                .max(min_size.h)
++                .min(output_geometry.size.h.max(min_size.h));
+         } else {
+             let max_size = mapped.max_size().unwrap_or(
+                 (
+@@ -473,6 +498,19 @@ impl FloatingLayout {
+ 
+         let position = position
+             .or_else(|| last_geometry.map(|g| g.loc))
++            .or_else(|| {
++                // [patch] pozycja z poprzedniego uruchomienia, dociśnięta do ekranu
++                remembered.map(|remembered| {
++                    let max_x = (output_geometry.loc.x + output_geometry.size.w - win_geo.size.w)
++                        .max(output_geometry.loc.x);
++                    let max_y = (output_geometry.loc.y + output_geometry.size.h - win_geo.size.h)
++                        .max(output_geometry.loc.y);
++                    Point::from((
++                        remembered.x.clamp(output_geometry.loc.x, max_x),
++                        remembered.y.clamp(output_geometry.loc.y, max_y),
++                    ))
++                })
++            })
+             .unwrap_or_else(|| {
+                 // cleanup moved windows
+                 if let Some(pos) = self
+@@ -704,6 +742,19 @@ impl FloatingLayout {
+                 mapped_geometry.size = server_size.as_local();
+             }
+             *window.last_geometry.lock().unwrap() = Some(mapped_geometry);
++            // [patch] zapamiętaj geometrię pod app_id, żeby przeżyła restart aplikacji
++            let app_id = window.saved_app_id.lock().unwrap().clone();
++            if let Some(app_id) = app_id {
++                crate::utils::window_memory::set(
++                    &app_id,
++                    crate::utils::window_memory::SavedGeometry {
++                        x: mapped_geometry.loc.x,
++                        y: mapped_geometry.loc.y,
++                        w: mapped_geometry.size.w,
++                        h: mapped_geometry.size.h,
++                    },
++                );
++            }
+         }
+ 
+         self.space.unmap_elem(window);
+diff --git a/src/utils/mod.rs b/src/utils/mod.rs
+index 401597c..23dcf2c 100644
+--- a/src/utils/mod.rs
++++ b/src/utils/mod.rs
+@@ -11,3 +11,4 @@ pub mod quirks;
+ pub mod rlimit;
+ pub mod screenshot;
+ pub mod tween;
++pub mod window_memory;
+diff --git a/src/utils/window_memory.rs b/src/utils/window_memory.rs
+new file mode 100644
+index 0000000..1634933
+--- /dev/null
++++ b/src/utils/window_memory.rs
+@@ -0,0 +1,91 @@
++// SPDX-License-Identifier: GPL-3.0-only
++//
++// Pamięć geometrii okien pomiędzy uruchomieniami aplikacji (dodatek lokalny).
++//
++// Upstreamowy cosmic-comp pamięta rozmiar/pozycję tylko przez czas życia okna
++// (CosmicMapped::last_geometry). Po zamknięciu aplikacji wiedza ginie, a nowe
++// okno pływające jest przycinane do 2/3 ekranu (floating::map_internal).
++// Ten moduł trzyma ostatnią geometrię pod kluczem app_id w
++// ~/.local/state/cosmic-comp/window-geometry.ron i pozwala ją odtworzyć.
++
++use std::{
++    collections::HashMap,
++    fs,
++    path::PathBuf,
++    sync::{Mutex, OnceLock},
++};
++
++use serde::{Deserialize, Serialize};
++use tracing::warn;
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub struct SavedGeometry {
++    pub x: i32,
++    pub y: i32,
++    pub w: i32,
++    pub h: i32,
++}
++
++struct Store {
++    path: Option<PathBuf>,
++    entries: HashMap<String, SavedGeometry>,
++}
++
++static STORE: OnceLock<Mutex<Store>> = OnceLock::new();
++
++fn store() -> &'static Mutex<Store> {
++    STORE.get_or_init(|| {
++        let path = xdg::BaseDirectories::new()
++            .place_state_file("cosmic-comp/window-geometry.ron")
++            .ok();
++        let entries = path
++            .as_deref()
++            .filter(|path| path.exists())
++            .and_then(|path| {
++                fs::read_to_string(path)
++                    .map_err(|err| warn!(?err, "Failed to read window-geometry.ron"))
++                    .ok()
++            })
++            .and_then(|raw| {
++                ron::from_str::<HashMap<String, SavedGeometry>>(&raw)
++                    .map_err(|err| warn!(?err, "Failed to parse window-geometry.ron"))
++                    .ok()
++            })
++            .unwrap_or_default();
++
++        Mutex::new(Store { path, entries })
++    })
++}
++
++/// Ostatnio zapamiętana geometria okna danej aplikacji.
++pub fn get(app_id: &str) -> Option<SavedGeometry> {
++    if app_id.is_empty() {
++        return None;
++    }
++    store().lock().unwrap().entries.get(app_id).copied()
++}
++
++/// Zapamiętaj geometrię okna. Zapis na dysk tylko gdy coś się faktycznie zmieniło.
++pub fn set(app_id: &str, geometry: SavedGeometry) {
++    if app_id.is_empty() || geometry.w <= 0 || geometry.h <= 0 {
++        return;
++    }
++
++    let mut store = store().lock().unwrap();
++    if store.entries.get(app_id) == Some(&geometry) {
++        return;
++    }
++    store.entries.insert(app_id.to_string(), geometry);
++
++    let Some(path) = store.path.clone() else {
++        return;
++    };
++    match ron::ser::to_string_pretty(&store.entries, ron::ser::PrettyConfig::default()) {
++        Ok(raw) => {
++            if let Err(err) = fs::write(&path, raw) {
++                warn!(?err, "Failed to write window-geometry.ron");
++            }
++        }
++        Err(err) => warn!(?err, "Failed to serialize window-geometry.ron"),
++    }
++}

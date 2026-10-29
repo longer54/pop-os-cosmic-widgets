@@ -1,1 +1,6 @@
 target/
+*.bak*
+*.orig
+.env
+konto.json
+*.db

@@ -1,0 +1,94 @@
+diff --git a/cosmic-applet-minimize/src/lib.rs b/cosmic-applet-minimize/src/lib.rs
+index 803ca97..83b8901 100644
+--- a/cosmic-applet-minimize/src/lib.rs
++++ b/cosmic-applet-minimize/src/lib.rs
+@@ -76,7 +76,24 @@ impl Minimize {
+         let button_total_size = self.core.applet.suggested_size(true).0
+             + self.core.applet.suggested_padding(true).0 * 2
+             + 4;
+-        let btn_count = max_major_axis_len / button_total_size as u32;
++        let btn_count = if self.core.applet.is_horizontal() {
++            // patch: przyciski z napisem maja rozna szerokosc — liczymy z grubsza
++            // po dlugosci nazwy, zostawiajac miejsce na przycisk przepelnienia.
++            let pad = self.core.applet.suggested_padding(true).0 as u32 * 2
++                + self.core.applet.spacing as u32;
++            let mut used = button_total_size as u32;
++            let mut n = 0u32;
++            for app in &self.apps {
++                used += label_width(&app.name) + pad;
++                if used > max_major_axis_len {
++                    break;
++                }
++                n += 1;
++            }
++            n
++        } else {
++            max_major_axis_len / button_total_size as u32
++        };
+         if btn_count >= self.apps.len() as u32 {
+             index = None;
+         } else {
+@@ -119,6 +136,24 @@ impl Minimize {
+     }
+ }
+ 
++// patch: maksymalna dlugosc napisu w panelu (dluzsze nazwy konczy wielokropek).
++const LABEL_MAX_CHARS: usize = 20;
++
++fn short_label(name: &str) -> String {
++    if name.chars().count() > LABEL_MAX_CHARS {
++        let mut s: String = name.chars().take(LABEL_MAX_CHARS - 1).collect();
++        s.push('…');
++        s
++    } else {
++        name.to_owned()
++    }
++}
++
++// Zgrubna szerokosc napisu w px (czcionka panelu ~8 px na znak).
++fn label_width(name: &str) -> u32 {
++    short_label(name).chars().count() as u32 * 8
++}
++
+ #[derive(Debug, Clone)]
+ enum Message {
+     Wayland(WaylandUpdate),
+@@ -325,17 +360,31 @@ impl cosmic::Application for Minimize {
+             (cross_padding, major_padding)
+         };
+         let theme = self.core.system_theme().cosmic();
++        let horizontal = self.core.applet.is_horizontal();
+         let icon_buttons = self.apps[..max_icon_count].iter().map(|app| {
++            // patch: w poziomym panelu napis z nazwa aplikacji zamiast miniaturki okna.
++            let content: Element<_> = if horizontal {
++                self.core
++                    .applet
++                    .text_button(
++                        self.core.applet.text(short_label(&app.name)),
++                        Message::Activate(app.toplevel_info.foreign_toplevel.clone()),
++                    )
++                    .into()
++            } else {
++                crate::window_image::WindowImage::new(
++                    app.wayland_image.clone(),
++                    &app.icon_source,
++                    width as f32,
++                    Message::Activate(app.toplevel_info.foreign_toplevel.clone()),
++                    padding,
++                )
++                .into()
++            };
+             self.core
+                 .applet
+                 .applet_tooltip(
+-                    Element::from(crate::window_image::WindowImage::new(
+-                        app.wayland_image.clone(),
+-                        &app.icon_source,
+-                        width as f32,
+-                        Message::Activate(app.toplevel_info.foreign_toplevel.clone()),
+-                        padding,
+-                    )),
++                    content,
+                     app.name.clone(),
+                     self.overflow_popup.is_some(),
+                     Message::Surface,

@@ -1,0 +1,23 @@
+[package]
+name = "cosmic-applet-nocny-filtr"
+version = "0.1.0"
+edition = "2021"
+description = "Aplet panelu COSMIC do nocnego filtra swiatla niebieskiego"
+
+[[bin]]
+name = "cosmic-applet-nocny-filtr"
+path = "src/main.rs"
+
+# Rewizja przypieta celowo: pod ta wersje pisane jest API popupu
+# (surface::action::app_popup). Ta sama, ktorej uzywa cosmic-widget-tasks.
+[dependencies]
+cosmic = { package = "libcosmic", git = "https://github.com/pop-os/libcosmic", rev = "74b2407342de7de1d9093a7dce34e4f58e6b53cd", default-features = false, features = [
+    "applet",
+    "tokio",
+    "wayland",
+] }
+ron = "0.8"
+serde = { version = "1", features = ["derive"] }
+
+[profile.release]
+opt-level = 2

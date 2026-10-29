@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Centrum powiadomień (szuflada z prawej)
+Comment=Panel wysuwany od prawej krawędzi z treścią widgetów pulpitowych
+Exec=cosmic-widget-drawer
+Terminal=false
+Categories=Utility;
+Keywords=COSMIC;szuflada;drawer;centrum;powiadomienia;widget;widżet;panel;
+Icon=view-sidebar-symbolic
+StartupNotify=false
+NoDisplay=false

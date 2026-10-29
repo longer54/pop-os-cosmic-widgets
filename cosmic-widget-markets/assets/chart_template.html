@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Wykres aktywa</title>
+<style>
+  html, body { margin:0; padding:0; background:#0f0f12; color:#f2f2f5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; height:100%; }
+  #header { padding: 16px 20px 0; }
+  #name { font-size: 20px; font-weight: 600; }
+  #sub { font-size: 13px; color: #9a9aa3; margin-top: 2px; }
+  #ranges { padding: 10px 20px; display:flex; gap:6px; }
+  #tools { padding: 0 20px 10px; display:flex; gap:6px; }
+  button { background:#1c1c22; color:#f2f2f5; border:1px solid #2c2c34; border-radius:6px; padding:6px 14px; cursor:pointer; font-size:13px; }
+  button.active { background:__UP_COLOR__; color:#0f0f12; border-color:__UP_COLOR__; }
+  #chart { width:100%; height: calc(100% - 152px); }
+  #empty { padding: 40px 20px; color:#9a9aa3; }
+</style>
+</head>
+<body>
+  <div id="header">
+    <div id="name">Wykres</div>
+    <div id="sub"></div>
+  </div>
+  <div id="ranges"></div>
+  <div id="tools">
+    <button id="btn-line" title="Kliknij, potem kliknij na wykresie, aby dodać poziomą linię z opisem">📏 Linia</button>
+    <button id="btn-point" title="Kliknij, potem kliknij na wykresie, aby dodać punkt z opisem">✛ Punkt</button>
+    <button id="btn-clear" title="Usuń wszystkie adnotacje na tym wykresie">🗑 Wyczyść</button>
+  </div>
+  <div id="chart"></div>
+  <div id="empty" style="display:none">Brak danych do pokazania.</div>
+  <script>__LWC_LIB__</script>
+  <script>
+    const DATA = __CHART_JSON__;
+    const UP_COLOR = "__UP_COLOR__";
+    const DOWN_COLOR = "__DOWN_COLOR__";
+
+    document.title = DATA.assetName + ' — wykres';
+    document.getElementById('name').textContent = DATA.assetName;
+    document.getElementById('sub').textContent = DATA.symbol + ' · ' + DATA.currency;
+
+    const series = (DATA.series || []).filter(function (s) { return s.points.length >= 2; });
+
+    if (series.length === 0) {
+      document.getElementById('chart').style.display = 'none';
+      document.getElementById('ranges').style.display = 'none';
+      document.getElementById('tools').style.display = 'none';
+      document.getElementById('empty').style.display = 'block';
+    } else {
+      const chart = LightweightCharts.createChart(document.getElementById('chart'), {
+        layout: { background: { color: '#0f0f12' }, textColor: '#c8c8cf' },
+        grid: { vertLines: { color: '#1c1c22' }, horzLines: { color: '#1c1c22' } },
+        timeScale: { timeVisible: true, secondsVisible: false },
+      });
+      let activeSeries = null;
+      let priceLineRefs = [];
+      let markersPrimitive = null;
+
+      // Adnotacje przetrwają nadpisanie pliku (widget generuje go od
+      // nowa przy każdym otwarciu) — trzymane w localStorage per
+      // symbol+waluta, bo plik zawsze leży pod tą samą ścieżką file://.
+      function annotStorageKey() {
+        return 'mkw_annot_' + DATA.symbol + '_' + DATA.currency;
+      }
+      function loadAnnotations() {
+        try {
+          const raw = localStorage.getItem(annotStorageKey());
+          if (raw) { return JSON.parse(raw); }
+        } catch (e) { /* localStorage niedostępny (np. file:// w niektórych przeglądarkach) */ }
+        return { lines: [], points: [] };
+      }
+      function saveAnnotations() {
+        try { localStorage.setItem(annotStorageKey(), JSON.stringify(annotations)); } catch (e) {}
+      }
+      const annotations = loadAnnotations();
+
+      function applyAnnotations() {
+        if (!activeSeries) return;
+        priceLineRefs.forEach(function (l) { activeSeries.removePriceLine(l); });
+        priceLineRefs = annotations.lines.map(function (l) {
+          return activeSeries.createPriceLine({
+            price: l.price,
+            color: '#e0b23c',
+            lineWidth: 1,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: l.text,
+          });
+        });
+        const markers = annotations.points
+          .slice()
+          .sort(function (a, b) { return a.time - b.time; })
+          .map(function (p) {
+            return { time: p.time, position: 'inBar', shape: 'circle', color: '#e0b23c', text: p.text };
+          });
+        if (markersPrimitive) {
+          markersPrimitive.setMarkers(markers);
+        } else {
+          markersPrimitive = LightweightCharts.createSeriesMarkers(activeSeries, markers);
+        }
+      }
+
+      function showRange(idx) {
+        const r = series[idx];
+        const points = r.points.map(function (p) { return { time: p[0], value: p[1] }; });
+        const up = points[points.length - 1].value >= points[0].value;
+        const color = up ? UP_COLOR : DOWN_COLOR;
+        if (activeSeries) { chart.removeSeries(activeSeries); }
+        activeSeries = chart.addSeries(LightweightCharts.AreaSeries, {
+          lineColor: color, topColor: color + '33', bottomColor: color + '00', lineWidth: 2,
+        });
+        activeSeries.setData(points);
+        priceLineRefs = [];
+        markersPrimitive = null;
+        applyAnnotations();
+        chart.timeScale().fitContent();
+        Array.prototype.forEach.call(document.querySelectorAll('#ranges button'), function (b, i) {
+          b.classList.toggle('active', i === idx);
+        });
+      }
+
+      const rangesEl = document.getElementById('ranges');
+      series.forEach(function (r, i) {
+        const b = document.createElement('button');
+        b.textContent = r.label;
+        b.onclick = function () { showRange(i); };
+        rangesEl.appendChild(b);
+      });
+      showRange(0);
+
+      let addMode = null;
+      const btnLine = document.getElementById('btn-line');
+      const btnPoint = document.getElementById('btn-point');
+      const btnClear = document.getElementById('btn-clear');
+      function setMode(mode) {
+        addMode = mode;
+        btnLine.classList.toggle('active', mode === 'line');
+        btnPoint.classList.toggle('active', mode === 'point');
+      }
+      btnLine.onclick = function () { setMode(addMode === 'line' ? null : 'line'); };
+      btnPoint.onclick = function () { setMode(addMode === 'point' ? null : 'point'); };
+      btnClear.onclick = function () {
+        if (!window.confirm('Usunąć wszystkie adnotacje na tym wykresie?')) return;
+        annotations.lines = [];
+        annotations.points = [];
+        saveAnnotations();
+        applyAnnotations();
+      };
+
+      chart.subscribeClick(function (param) {
+        if (!addMode || !activeSeries) return;
+        if (addMode === 'line') {
+          if (!param.point) return;
+          const price = activeSeries.coordinateToPrice(param.point.y);
+          if (price === null || price === undefined) return;
+          const text = window.prompt('Opis linii poziomej (opcjonalnie):', '') || '';
+          annotations.lines.push({ price: price, text: text });
+        } else if (addMode === 'point') {
+          if (!param.time) return;
+          const text = window.prompt('Opis punktu (opcjonalnie):', '') || '';
+          annotations.points.push({ time: param.time, text: text });
+        }
+        saveAnnotations();
+        applyAnnotations();
+        setMode(null);
+      });
+
+      window.addEventListener('resize', function () {
+        chart.applyOptions({ width: document.getElementById('chart').clientWidth });
+      });
+    }
+  </script>
+</body>
+</html>

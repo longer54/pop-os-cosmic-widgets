@@ -2,8 +2,9 @@
 //! corner (same mechanism as `cosmic-widget-panel`), positioned below the
 //! services-status widget by default. Behaves like Obsidian's own
 //! calendar: clicking a day opens (creating it from the daily-note
-//! template if needed) that day's note in Obsidian, and each day shows the
-//! same word-count dots as Obsidian's Calendar plugin.
+//! template if needed) that day's note — in Obsidian or directly as a
+//! `.md` file, depending on the persistent "Obsidian" toggle — and each
+//! day shows the same word-count dots as Obsidian's Calendar plugin.
 
 use std::collections::HashMap;
 use std::time::Duration;
@@ -14,12 +15,13 @@ use cosmic::iced::platform_specific::runtime::wayland::layer_surface::{
     IcedMargin, SctkLayerSurfaceSettings,
 };
 use cosmic::iced::platform_specific::shell::commands::layer_surface::{
-    get_layer_surface, Anchor, KeyboardInteractivity, Layer,
+    destroy_layer_surface, get_layer_surface, set_margin, Anchor, KeyboardInteractivity, Layer,
 };
 use cosmic::iced::window;
-use cosmic::iced::{Background, Color, Length, Shadow, Subscription, Vector};
-use cosmic::widget::{button, container, text, tooltip};
+use cosmic::iced::{Background, Color, Length, Subscription};
+use cosmic::widget::{button, container, text};
 use cosmic::Element;
+use cosmic_widget_common::{desktop, drag, glass, Glass, Outcome, WidgetPos};
 use jiff::civil::{Date, Weekday};
 
 use crate::config::Config;
@@ -49,11 +51,17 @@ pub struct Widget {
     core: Core,
     surface_id: window::Id,
     config: Config,
+    pos: WidgetPos,
+    /// Szkło karty: przezroczystość + region rozmycia tła.
+    glass: Glass,
     vault: Vault,
     calendar: CalendarState,
     holidays: HolidayData,
     /// Note-dot counts for the currently visible grid, keyed by date.
     dots: HashMap<Date, u32>,
+    /// Czy powierzchnia layer-shell istnieje w tej chwili. `false` = jesteśmy
+    /// na innym pulpicie wirtualnym i widget jest schowany (patrz `desktop`).
+    visible: bool,
 }
 
 fn anchor_from_str(s: &str) -> Anchor {
@@ -65,6 +73,38 @@ fn anchor_from_str(s: &str) -> Anchor {
     }
 }
 
+/// Ustawienia powierzchni layer-shell. Wydzielone, bo widget odtwarza ją po
+/// powrocie na swój pulpit wirtualny (`Message::DesktopVisible`), a nie
+/// tylko raz przy starcie.
+fn surface_settings(
+    id: window::Id,
+    anchor: &str,
+    margin_x: i32,
+    margin_y: i32,
+    width: u32,
+) -> SctkLayerSurfaceSettings {
+    SctkLayerSurfaceSettings {
+        id,
+        // NIE zmieniać na Layer::Background (sprawdzone 2026-08-11): reszta
+        // widgetów zniosła to bez szkody, ale ten jeden ląduje wtedy pod
+        // tapetą plasmashella i znika z pulpitu na dobre — proces żyje i
+        // publikuje geometrię, a na ekranie go nie ma.
+        layer: Layer::Bottom,
+        keyboard_interactivity: KeyboardInteractivity::None,
+        anchor: anchor_from_str(anchor),
+        margin: IcedMargin {
+            top: margin_y,
+            right: margin_x,
+            bottom: margin_y,
+            left: margin_x,
+        },
+        size: Some((Some(width), Some(WIDGET_HEIGHT))),
+        exclusive_zone: 0,
+        namespace: "cosmic-calendar-widget".into(),
+        ..Default::default()
+    }
+}
+
 // =========================================================================
 // Application Trait
 // =========================================================================
@@ -73,7 +113,7 @@ impl cosmic::Application for Widget {
     type Executor = cosmic::executor::Default;
     type Flags = Config;
     type Message = Message;
-    const APP_ID: &'static str = "com.example.CosmicCalendarWidget";
+    const APP_ID: &'static str = "io.github.longer54.CosmicCalendarWidget";
 
     fn core(&self) -> &Core {
         &self.core
@@ -85,42 +125,55 @@ impl cosmic::Application for Widget {
 
     fn init(mut core: Core, config: Config) -> (Self, Task<Message>) {
         core.window.show_headerbar = false;
+        // Automatyczny blur libcosmica bierze CAŁY prostokąt powierzchni
+        // layer-shell — szkło wypełniłoby też przezroczyste szpary między
+        // kartami i kwadratowe rogi poza zaokrągleniem. Pusty zestaw = nie
+        // proś kompozytora o blur automatycznie; region podajemy sami,
+        // dokładnie pod kartami (`glass::blur_task`).
+        core.set_auto_blur(Default::default());
 
         let surface_id = window::Id::unique();
-        let anchor = anchor_from_str(&config.anchor);
-        let margin = IcedMargin {
-            top: config.margin_y,
-            right: config.margin_x,
-            bottom: config.margin_y,
-            left: config.margin_x,
-        };
-
-        let surface_task = get_layer_surface(SctkLayerSurfaceSettings {
-            id: surface_id,
-            layer: Layer::Bottom,
-            keyboard_interactivity: KeyboardInteractivity::None,
-            anchor,
-            margin,
-            size: Some((Some(config.width), Some(WIDGET_HEIGHT))),
-            exclusive_zone: 0,
-            namespace: "cosmic-calendar-widget".into(),
-            ..Default::default()
-        });
-
         let vault = Vault::from_config(&config);
         let calendar = CalendarState::today();
+        // Powierzchnia POWSTAJE PO `WidgetPos` i z jego marginesów, nie
+        // z surowego configu — patrz `WidgetPos::new` (config bywa
+        // nieświeży, prawdziwą pozycję zna opublikowana geometria).
+        let mut pos = WidgetPos::new(
+            "calendar",
+            &config.anchor,
+            config.margin_x,
+            config.margin_y,
+            config.width,
+            Some(config.stack_below.clone()),
+            config.stack_gap,
+            config.stack_offset_y,
+        );
+        pos.set_height(WIDGET_HEIGHT);
+
+        let surface_task = get_layer_surface(surface_settings(
+            surface_id,
+            &config.anchor,
+            pos.margin_x(),
+            pos.margin_y(),
+            config.width,
+        ));
+        let glass = Glass::from_config(&config.glass);
         let mut widget = Widget {
             core,
             surface_id,
             config,
+            pos,
+            glass,
             vault,
             calendar,
             holidays: HolidayData::load(),
             dots: HashMap::new(),
+            visible: true,
         };
         widget.refresh_dots();
 
-        (widget, surface_task)
+        let blur = widget.blur_task();
+        (widget, Task::batch([surface_task, blur]))
     }
 
     /// Main window is suppressed — empty view.
@@ -136,7 +189,25 @@ impl cosmic::Application for Widget {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        cosmic::iced::time::every(Duration::from_secs(DOT_REFRESH_SECS)).map(|_| Message::Tick)
+        let mut subs = vec![
+            cosmic::iced::time::every(Duration::from_secs(DOT_REFRESH_SECS)).map(|_| Message::Tick),
+        ];
+        if self.pos.dragging() {
+            subs.push(drag::subscription().map(Message::Drag));
+        }
+        // Schowany widget nie ma powierzchni, więc nie ma czego przesuwać.
+        if self.pos.is_stacked() && self.visible {
+            subs.push(
+                cosmic::iced::time::every(Duration::from_secs(2)).map(|_| Message::StackTick),
+            );
+        }
+        subs.push(glass::subscription(self.glass.level()).map(Message::Glass));
+        if self.config.only_on_desktop > 0 {
+            subs.push(
+                desktop::subscription(self.config.only_on_desktop).map(Message::DesktopVisible),
+            );
+        }
+        Subscription::batch(subs)
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
@@ -147,8 +218,12 @@ impl cosmic::Application for Widget {
                     eprintln!("cosmic-calendar-widget: nie mogę utworzyć notatki {date}: {e}");
                 }
                 self.dots.insert(date, self.vault.dots_for(date));
-                let uri = self.vault.open_uri(date);
-                if let Err(e) = std::process::Command::new("xdg-open").arg(uri).spawn() {
+                let target = if self.config.open_in_obsidian {
+                    self.vault.open_uri(date)
+                } else {
+                    self.vault.note_path(date).to_string_lossy().into_owned()
+                };
+                if let Err(e) = std::process::Command::new("xdg-open").arg(target).spawn() {
                     eprintln!("cosmic-calendar-widget: nie mogę uruchomić xdg-open: {e}");
                 }
                 Task::none()
@@ -172,6 +247,59 @@ impl cosmic::Application for Widget {
                 self.refresh_dots();
                 Task::none()
             }
+            Message::ToggleOpenMode(enabled) => {
+                self.config.open_in_obsidian = enabled;
+                self.config.save();
+                Task::none()
+            }
+            Message::DragStart => {
+                self.pos.start_drag();
+                Task::none()
+            }
+            Message::Drag(ev) => match self.pos.on_event(&ev, self.surface_id) {
+                Outcome::Moved => self.margin_task(),
+                Outcome::Released => {
+                    self.save_position();
+                    self.margin_task()
+                }
+                Outcome::None => Task::none(),
+            },
+            Message::Glass(g) => {
+                self.glass = g;
+                self.blur_task()
+            }
+            Message::StackTick => {
+                if self.pos.stack_tick() {
+                    self.pos.publish();
+                    self.margin_task()
+                } else {
+                    Task::none()
+                }
+            }
+            // Zejście na inny pulpit = zniszcz powierzchnię (KWin nie umie
+            // przypiąć layer-shella do pulpitu); powrót = odtwórz ją, z
+            // pozycją z `pos`, żeby przeciągnięcia i stack nie przepadły.
+            Message::DesktopVisible(show) => {
+                if show == self.visible {
+                    return Task::none();
+                }
+                self.visible = show;
+                if show {
+                    self.surface_id = window::Id::unique();
+                    Task::batch([
+                        get_layer_surface(surface_settings(
+                            self.surface_id,
+                            &self.config.anchor,
+                            self.pos.margin_x(),
+                            self.pos.margin_y(),
+                            self.config.width,
+                        )),
+                        self.blur_task(),
+                    ])
+                } else {
+                    destroy_layer_surface(self.surface_id)
+                }
+            }
         }
     }
 
@@ -185,6 +313,39 @@ impl cosmic::Application for Widget {
 }
 
 impl Widget {
+    /// Region rozmycia tła pod kartą. Kompozytor gubi go razem z
+    /// powierzchnią, więc wołamy to po każdym jej utworzeniu. Wysokość jest
+    /// tu stała (`WIDGET_HEIGHT`), więc nie ma czego odświeżać przy resize.
+    fn blur_task(&self) -> Task<Message> {
+        glass::blur_task_single(self.surface_id, self.glass, self.config.width, WIDGET_HEIGHT)
+    }
+
+    /// Zastosuj aktualną pozycję z `self.pos` na powierzchni.
+    fn margin_task(&self) -> Task<Message> {
+        set_margin(
+            self.surface_id,
+            self.pos.margin_y(),
+            self.pos.margin_x(),
+            self.pos.margin_y(),
+            self.pos.margin_x(),
+        )
+    }
+
+    /// Koniec przeciągania: utrwal nową pozycję w configu.
+    fn save_position(&mut self) {
+        self.config.margin_x = self.pos.margin_x();
+        // `margin_y` zapisujemy ZAWSZE, także w stacku: to jedyna kopia
+        // pozycji, która przeżyje wyczyszczenie `~/.cache`. Wcześniej
+        // stackowany widget zapisywał wyłącznie `stack_offset_y`, więc
+        // `margin_y` w configu zostawał skamieliną sprzed miesięcy.
+        self.config.margin_y = self.pos.margin_y();
+        if self.pos.is_stacked() {
+            self.config.stack_offset_y = self.pos.stack_offset_y();
+        }
+        self.config.save();
+        self.pos.publish();
+    }
+
     /// Rescans the currently visible 6x7 day grid and updates the dot
     /// cache. Cheap: each visible day is a small markdown file read at most.
     fn refresh_dots(&mut self) {
@@ -220,11 +381,13 @@ impl Widget {
             .center_x(Length::Fill);
 
         let header = cosmic::widget::row::with_children(vec![
+            drag::handle(Message::DragStart),
             prev_btn.into(),
             title.into(),
             next_btn.into(),
         ])
-        .spacing(4);
+        .spacing(4)
+        .align_y(cosmic::iced::Alignment::Center);
 
         // ---- Weekday labels ----
         let weekday_row = cosmic::widget::row::with_children(
@@ -249,7 +412,7 @@ impl Widget {
         for _row in 0..ROWS {
             let mut cells: Vec<Element<'_, Message>> = Vec::with_capacity(COLS);
             for _col in 0..COLS {
-                cells.push(self.build_day_cell(current, state, today, holidays));
+                cells.push(self.build_day_cell(current, state, today));
                 current = current.tomorrow().expect("date overflow");
             }
             grid_rows.push(cosmic::widget::row::with_children(cells).spacing(0).into());
@@ -257,10 +420,24 @@ impl Widget {
 
         let grid = cosmic::widget::column::with_children(grid_rows).spacing(2);
 
-        // ---- Today button at bottom ----
+        // ---- Bottom row: "Dziś" + persistent open-mode toggle ----
         let today_btn = button::standard("Dziś")
             .on_press(Message::GoToToday)
             .width(Length::Fill);
+        // Trwały przełącznik: włączony = klik w dzień otwiera Obsidiana,
+        // wyłączony = klik otwiera plik .md bezpośrednio.
+        let mode_toggle = cosmic::widget::toggler(self.config.open_in_obsidian)
+            .label("Obsidian".to_string())
+            .spacing(6.0)
+            .on_toggle(Message::ToggleOpenMode);
+        let bottom_row = cosmic::widget::row::with_children(vec![
+            today_btn.into(),
+            container(mode_toggle)
+                .center_y(Length::Shrink)
+                .padding([6, 0, 0, 4])
+                .into(),
+        ])
+        .spacing(6);
 
         // ---- Upcoming holidays ----
         let upcoming = self.build_upcoming_holidays(state, holidays);
@@ -276,28 +453,21 @@ impl Widget {
             content = content.push(container(upcoming_section).padding([4, 0]));
         }
 
-        content = content.push(container(today_btn).padding([6, 16]));
+        content = content.push(container(bottom_row).padding([6, 16]));
 
         // Tinted glass card background, same visual language as the
         // services-status widget it sits below.
         container(content)
             .padding([12, 10, 10, 10])
-            .class(cosmic::theme::Container::custom(glass_style))
+            .class(cosmic::theme::Container::custom(self.glass.container()))
             .width(Length::Fixed(self.config.width as f32))
             .into()
     }
 
     /// Build one day cell: day number + a row of note-dots below it.
-    fn build_day_cell(
-        &self,
-        date: Date,
-        state: &CalendarState,
-        today: Date,
-        holidays: &HolidayData,
-    ) -> Element<'_, Message> {
+    fn build_day_cell(&self, date: Date, state: &CalendarState, today: Date) -> Element<'_, Message> {
         let is_today = date == today;
         let is_selected = date == state.selected;
-        let holiday = holidays.get(date);
         let dot_count = self.dots.get(&date).copied().unwrap_or(0);
 
         let day_label = text::body(format!("{}", date.day()));
@@ -335,11 +505,10 @@ impl Widget {
             })
             .on_press(Message::SelectDate(date));
 
-        if let Some(h) = holiday {
-            tooltip::tooltip(btn, text::body(h.name), tooltip::Position::Top).into()
-        } else {
-            btn.into()
-        }
+        // tooltip::tooltip renderował się źle w tym layer-shell surface'ie
+        // (pusta ciemna belka zamiast dymka nad kursorem) — nazwa święta
+        // i tak jest widoczna w liście "najbliższe święta" pod kalendarzem.
+        btn.into()
     }
 
     /// Build upcoming holidays list for ~2 months ahead.
@@ -420,25 +589,6 @@ fn note_dot<'a>() -> Element<'a, Message> {
 // Style
 // =========================================================================
 
-/// Tinted-glass card look, matching `cosmic-widget-panel`.
-fn glass_style(_theme: &cosmic::Theme) -> cosmic::iced::widget::container::Style {
-    cosmic::iced::widget::container::Style {
-        icon_color: Some(Color::from_rgb(0.95, 0.95, 0.97)),
-        text_color: Some(Color::from_rgb(0.95, 0.95, 0.97)),
-        background: Some(Background::Color(Color::from_rgba(0.08, 0.08, 0.1, 0.55))),
-        border: Border {
-            color: Color::from_rgba(1.0, 1.0, 1.0, 0.14),
-            width: 1.0,
-            radius: 18.0.into(),
-        },
-        shadow: Shadow {
-            color: Color::from_rgba(0.0, 0.0, 0.0, 0.35),
-            offset: Vector::new(0.0, 6.0),
-            blur_radius: 24.0,
-        },
-        snap: true,
-    }
-}
 
 // =========================================================================
 // Helpers
