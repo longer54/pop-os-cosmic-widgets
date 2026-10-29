@@ -1,45 +1,24 @@
-# cosmic-widget-common — wspólny kod widgetów
+# cosmic-widget-common — shared widget code
 
-Biblioteka (crate) używana przez widgety z tego repo — nie jest osobnym programem.
+🇵🇱 [Polska wersja](README.pl.md)
 
-## Funkcje
-- `drag` — przeciąganie powierzchni layer-shell myszką i zapis pozycji
-- `geometry`/`WidgetPos` — auto-układanie widgetów w kolumnie (`stack_below`)
-- `glass` — przezroczystość z suwaka doka + rozmycie tła (`ext-background-effect-v1`)
-- `vault_io` — zapis do vaulta lokalnie lub przez SSH na serwer
+A library crate used by the widgets in this repo — not a standalone program.
 
-## Wymagania
+## Features
+- `drag` — dragging layer-shell surfaces with the mouse and saving their position
+- `geometry`/`WidgetPos` — automatic stacking of widgets in a column (`stack_below`)
+- `glass` — transparency taken from the dock's slider + background blur (`ext-background-effect-v1`)
+- `vault_io` — writing to the vault locally or over SSH to a server
+
+## Requirements
 COSMIC (cosmic-comp ≥ 1.0, layer-shell), Rust (rustup, edition 2024), `libxkbcommon-dev`.
 
-## Budowanie
-Budowana automatycznie jako zależność (`path = "../cosmic-widget-common"`). / Built automatically as a path dependency.
+## Building
+Built automatically as a path dependency (`path = "../cosmic-widget-common"`).
 
-## Konfiguracja
-Brak — konfigurują ją widgety.
-
----
-
-## English
-
-Library crate used by the widgets in this repo — not a standalone program.
-
-### Features
-- `drag` — mouse dragging of layer-shell surfaces, position saved to config
-- `geometry`/`WidgetPos` — automatic column stacking (`stack_below`)
-- `glass` — transparency from the dock slider + background blur (`ext-background-effect-v1`)
-- `vault_io` — vault writes locally or over SSH to a server
-
-### Requirements
-COSMIC desktop (cosmic-comp ≥ 1.0, layer-shell), Rust (rustup, edition 2024), `libxkbcommon-dev`.
-
-### Building
-Same as above.
-
-### Configuration
-None — configured by the widgets.
+## Configuration
+None — it is configured by the widgets.
 
 ---
-
-**Zastrzeżenie:** Prywatny projekt hobbystyczny, tworzony do nauki i własnego użytku. Nie jest powiązany z System76 ani projektem COSMIC. Korzysta z otwartych narzędzi i publicznych źródeł danych. Oprogramowanie udostępniane „tak jak jest”, bez gwarancji.
 
 **Disclaimer:** Private hobby project, built for learning and personal use. Not affiliated with System76 or the COSMIC project. Built with open-source tools and public data sources. Provided “as is”, without warranty of any kind.

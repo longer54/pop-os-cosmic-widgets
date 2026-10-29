@@ -1,22 +1,24 @@
-# Strażnik łatek apletów panelu COSMIC
+# COSMIC panel applet patch guard
 
-Łatane aplety siedzą w `~/.local/bin` i muszą pasować do wersji pakietu
-`cosmic-applets`:
+🇵🇱 [Polska wersja](README.pl.md)
 
-| binarka | łatka |
+The patched applets live in `~/.local/bin` and must match the version of the
+`cosmic-applets` package:
+
+| binary | patch |
 |---|---|
-| `cosmic-applet-battery` | `tryby-mocy-cpu/` (nie ma w tym repo — pomijane, jeśli brak) |
+| `cosmic-applet-battery` | `tryby-mocy-cpu/` (not in this repo — skipped if missing) |
 | `cosmic-applet-minimize` | `cosmic-applet-minimize-napisy/` |
 | `cosmic-applet-time` | `cosmic-applet-zegar-obsidian/` |
 
-Timer `cosmic-applets-latki.timer` (systemd --user, co 15 min + 3 min po
-starcie) odpala `auto-przebuduj.sh`. Gdy wersja pakietu się zmieniła,
-przebudowuje w tle każdą łatkę obecną na urządzeniu, robi `pkill -x cosmic-panel`
-i wysyła powiadomienie. Gdy build padnie: ta łatka wraca do stockowej wersji,
-powiadomienie krytyczne, bez ponawiania do następnej aktualizacji.
+The `cosmic-applets-latki.timer` timer (systemd --user, every 15 min + 3 min after
+boot) runs `auto-przebuduj.sh`. When the package version has changed, it
+rebuilds every patch present on the machine in the background, runs `pkill -x cosmic-panel`
+and sends a notification. If a build fails: that patch falls back to the stock version,
+a critical notification is shown, and no retry happens until the next update.
 
-- Instalacja timera: utwórz `~/.config/systemd/user/cosmic-applets-latki.{service,timer}`
-  (service uruchamia `auto-przebuduj.sh`, timer `OnBootSec=3min`, `OnUnitActiveSec=15min`).
-- Stan: `~/.local/state/cosmic-applets-latki.wersja`, log: `~/.local/state/cosmic-applets-latki.log`.
-- Wymuszenie przebudowy: wpisz do pliku stanu dowolną inną wersję i
+- Installing the timer: create `~/.config/systemd/user/cosmic-applets-latki.{service,timer}`
+  (the service runs `auto-przebuduj.sh`, the timer has `OnBootSec=3min`, `OnUnitActiveSec=15min`).
+- State: `~/.local/state/cosmic-applets-latki.wersja`, log: `~/.local/state/cosmic-applets-latki.log`.
+- Forcing a rebuild: write any other version into the state file and run
   `systemctl --user start cosmic-applets-latki.service`.
