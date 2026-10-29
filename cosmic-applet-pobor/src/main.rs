@@ -27,7 +27,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const ID: &str = "io.github.longer54.CosmicAppletPobor";
 const BAT: &str = "/sys/class/power_supply/BAT0";
-/// Czesciej nie ma sensu: firmware HP odswieza prad baterii co kilka minut,
+/// Czesciej nie ma sensu: firmware laptopa odswieza prad baterii co kilka minut,
 /// a kazde odswiezenie panelu budzi kompozytor.
 const CO_ILE_S: u64 = 30;
 const HISTORIA_H: u64 = 12;
@@ -289,7 +289,7 @@ impl Aplet {
         }
 
         kolumna = kolumna.add(cosmic::applet::padded_control(text::caption(
-            "Bateria HP odświeża odczyt co kilka minut, więc „teraz” bywa nieświeże — miarodajne są średnie. Tylko na baterii (zasilacz nie podaje poboru). Czas pracy wg średniej z 1 h.",
+            "Bateria laptopa często odświeża odczyt co kilka minut, więc „teraz” bywa nieświeże — miarodajne są średnie. Tylko na baterii (zasilacz nie podaje poboru). Czas pracy wg średniej z 1 h.",
         )));
 
         self.core.applet.popup_container(kolumna).into()
