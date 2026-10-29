@@ -1,14 +1,16 @@
-# Aplet „zminimalizowane” — napisy zamiast miniatur (COSMIC)
+# “Minimised” applet — text labels instead of thumbnails (COSMIC)
 
-Stockowy aplet `cosmic-applet-minimize` pokazuje w panelu miniaturkę okna.
-Łatka zamienia ją na **napis z nazwą aplikacji** (np. „Gmail”) w stylu
-przycisków „Obszary robocze” / „Aplikacje”. Klik przywraca okno, dymek
-z nazwą zostaje. Na pionowym panelu zostają miniaturki. Nazwy dłuższe
-niż 20 znaków kończą się „…”.
+🇵🇱 [Polska wersja](README.pl.md)
 
-- Łatka: `latka/napisy-zamiast-miniatur.patch` (na tag `epoch-<wersja pakietu>`).
-- Budowa i wgranie: `sh build-latka.sh` → `~/.local/bin/cosmic-applet-minimize`
-  (PATH przykrywa /usr/bin, bez sudo). Potem `pkill -x cosmic-panel`.
-- **Po `pacman -Syu` ruszającym `cosmic-applets` przebudować** (jak pozostałe łatki apletów). Uwaga: oba skrypty używają tego samego drzewa źródeł
-  i robią `checkout -f`, więc każdy buduje tylko swój aplet — to OK.
-- Cofnięcie: `rm ~/.local/bin/cosmic-applet-minimize && pkill -x cosmic-panel`.
+The stock `cosmic-applet-minimize` applet shows a window thumbnail in the panel.
+This patch replaces it with a **text label with the app name** (e.g. “Gmail”), styled
+like the “Workspaces” / “Applications” buttons. Clicking restores the window; the
+tooltip with the name stays. On a vertical panel the thumbnails remain. Names longer
+than 20 characters are truncated with “…”.
+
+- Patch: `latka/napisy-zamiast-miniatur.patch` (against the `epoch-<package version>` tag).
+- Build and install: `sh build-latka.sh` → `~/.local/bin/cosmic-applet-minimize`
+  (PATH takes precedence over /usr/bin, no sudo). Then `pkill -x cosmic-panel`.
+- **Rebuild after any `pacman -Syu` that touches `cosmic-applets`** (same as the other applet patches). Note: both scripts use the same source tree
+  and run `checkout -f`, so each one builds only its own applet — that's fine.
+- Revert: `rm ~/.local/bin/cosmic-applet-minimize && pkill -x cosmic-panel`.

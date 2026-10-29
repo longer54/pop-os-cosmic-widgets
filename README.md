@@ -1,5 +1,7 @@
 # Pop!_OS COSMIC Desktop Widgets
 
+🇵🇱 [Polska wersja](README.pl.md)
+
 Lightweight desktop widgets, panel applets and small tools for the [COSMIC desktop](https://github.com/pop-os/cosmic-epoch) (Pop!_OS), written in Rust with [libcosmic](https://github.com/pop-os/libcosmic)/iced. Each widget is a standalone binary that pins itself to a corner of the screen via Wayland's layer-shell protocol and refreshes its content on a timer — no panel applet API required.
 
 ## Widgets
@@ -27,7 +29,7 @@ Lightweight desktop widgets, panel applets and small tools for the [COSMIC deskt
 | [`cosmic-widget-common`](cosmic-widget-common/) | Shared crate: mouse drag, auto-stacking, glass/blur, vault I/O |
 | [`patches/`](patches/) | Patches for `cosmic-comp` and COSMIC panel applets (window size memory, minimized-window labels, Obsidian clock) |
 
-Each widget has its own README with config details and setup steps.
+Each widget has its own README with config details and setup steps. Note: the widgets' UI strings are currently in Polish.
 
 ## Common architecture
 
@@ -65,20 +67,14 @@ All widgets share the same `anchor` (`top-left` / `top-right` / `bottom-left` / 
 - **Widget never resizes to fit its content / content looks clipped at the bottom**: the estimated-height calculation in that widget's `app.rs` is under-counting real row height. Increase the per-row pixel constant in `estimated_height()` — better to over-provision (extra blank space) than clip content, since layer-shell surfaces don't scroll.
 - **Binary built on one machine doesn't run on another**: `target/` is architecture/toolchain-specific and isn't meant to be copied between machines — rebuild with `cargo build --release` on each one.
 
-## Po polsku (skrót)
+## Po polsku
 
-Zestaw widgetów pulpitowych, apletów panelu i drobnych narzędzi dla pulpitu
-COSMIC (Pop!_OS), w Ruście (libcosmic/iced). Każdy katalog to osobny program
-z własnym README; konfiguracja w `~/.config/<nazwa>/config.toml` (tworzona
-przy pierwszym uruchomieniu z neutralnymi wartościami domyślnymi). Budowanie:
-`cargo build --release` w katalogu projektu. Teksty interfejsu są po polsku.
+Polska wersja tego README: [README.pl.md](README.pl.md). Subprojects with a Polish version have their own `README.pl.md`.
 
 ## License
 
 GPL-3.0-or-later — see [LICENSE](LICENSE).
 
-## Zastrzeżenie / Disclaimer
+## Disclaimer
 
-PL: Prywatny projekt hobbystyczny, tworzony do nauki i własnego użytku. Nie jest powiązany z System76 ani projektem COSMIC. Korzysta z otwartych narzędzi i publicznych źródeł danych. Oprogramowanie udostępniane „tak jak jest”, bez gwarancji.
-
-EN: Private hobby project, built for learning and personal use. Not affiliated with System76 or the COSMIC project. Built with open-source tools and public data sources. Provided “as is”, without warranty of any kind.
+Private hobby project, built for learning and personal use. Not affiliated with System76 or the COSMIC project. Built with open-source tools and public data sources. Provided “as is”, without warranty of any kind.

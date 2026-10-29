@@ -1,44 +1,25 @@
-# cosmic-applet-pobor — pobór prądu w panelu
+# cosmic-applet-pobor — power draw in the panel
 
-Aplet panelu COSMIC pokazujący pobór prądu laptopa (z `/sys/class/power_supply/BAT0`) teraz i średnie z ostatnich godzin.
+🇵🇱 [Polska wersja](README.pl.md)
 
-## Funkcje
-- próbka co 30 s, historia 12 h w `~/.local/state/pobor-pradu/`
-- popup ze średnimi
+A COSMIC panel applet showing the laptop's current power draw (from `/sys/class/power_supply/BAT0`) and averages over the last few hours.
 
-## Wymagania
-COSMIC, laptop z baterią `BAT0`, Rust.
+## Features
+- a sample every 30 s, 12 h of history in `~/.local/state/pobor-pradu/`
+- popup with the averages
 
-## Budowanie
-```sh
-cd cosmic-applet-pobor
-sh install.sh   # buduje, instaluje do ~/.local i dopina aplet do panelu / builds, installs, adds to panel
-```
-
-## Konfiguracja
-Stałe w `src/main.rs` (`BAT`, `CO_ILE_S`, `HISTORIA_H`).
-
----
-
-## English
-
-COSMIC panel applet showing laptop power draw (from `/sys/class/power_supply/BAT0`) now and averages over the last hours.
-
-### Features
-- sample every 30 s, 12 h history in `~/.local/state/pobor-pradu/`
-- popup with averages
-
-### Requirements
+## Requirements
 COSMIC, a laptop with a `BAT0` battery, Rust.
 
-### Building
-Same as above.
+## Building
+```sh
+cd cosmic-applet-pobor
+sh install.sh   # builds, installs into ~/.local and adds the applet to the panel
+```
 
-### Configuration
+## Configuration
 Constants in `src/main.rs` (`BAT`, `CO_ILE_S`, `HISTORIA_H`).
 
 ---
-
-**Zastrzeżenie:** Prywatny projekt hobbystyczny, tworzony do nauki i własnego użytku. Nie jest powiązany z System76 ani projektem COSMIC. Korzysta z otwartych narzędzi i publicznych źródeł danych. Oprogramowanie udostępniane „tak jak jest”, bez gwarancji.
 
 **Disclaimer:** Private hobby project, built for learning and personal use. Not affiliated with System76 or the COSMIC project. Built with open-source tools and public data sources. Provided “as is”, without warranty of any kind.
