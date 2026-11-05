@@ -21,6 +21,7 @@ Lightweight desktop widgets, panel applets and small tools for the [COSMIC deskt
 
 | Project | What it does |
 |---|---|
+| [`cosmic-widgets-manager`](cosmic-widgets-manager/) | GUI: start/stop widgets, autostart, pick your Obsidian vault |
 | [`cosmic-quicklook`](cosmic-quicklook/) | macOS-style Quick Look: preview the selected file (image, PDF, text, video) |
 | [`cosmic-okno`](cosmic-okno/) | CLI to show/hide/toggle windows from keyboard shortcuts |
 | [`cosmic-tray-reset`](cosmic-tray-reset/) | Tray icon that restarts the desktop widgets |

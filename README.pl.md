@@ -21,6 +21,7 @@ Lekkie widgety pulpitowe, aplety panelu i drobne narzędzia dla [pulpitu COSMIC]
 
 | Projekt | Co robi |
 |---|---|
+| [`cosmic-widgets-manager`](cosmic-widgets-manager/) | GUI: uruchamianie widżetów, autostart, wybór vaulta Obsidiana |
 | [`cosmic-quicklook`](cosmic-quicklook/) | Quick Look jak w macOS: podgląd zaznaczonego pliku (obraz, PDF, tekst, wideo) |
 | [`cosmic-okno`](cosmic-okno/) | CLI do pokazywania/chowania/przełączania okien skrótami klawiszowymi |
 | [`cosmic-tray-reset`](cosmic-tray-reset/) | Ikona w zasobniku restartująca widgety pulpitu |

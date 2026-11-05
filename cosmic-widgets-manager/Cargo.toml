@@ -1,0 +1,19 @@
+[package]
+name = "cosmic-widgets-manager"
+version = "0.1.0"
+description = "GUI to enable, configure and autostart the COSMIC desktop widgets, and to plug in an Obsidian vault"
+edition = "2024"
+rust-version = "1.85"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+cosmic = { package = "libcosmic", git = "https://github.com/pop-os/libcosmic", default-features = false, features = [
+    "multi-window",
+    "tokio",
+    "wayland",
+    "winit",
+    "wgpu",
+    "xdg-portal",
+] }
+toml_edit = "0.22"
+dirs = "5"
