@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=COSMIC Widgets
+Name[pl]=Widżety COSMIC
+Comment=Enable, configure and autostart the COSMIC desktop widgets
+Comment[pl]=Włączaj, ustawiaj i uruchamiaj przy starcie widżety pulpitu COSMIC
+Exec=cosmic-widgets-manager
+Icon=preferences-desktop-apps
+Terminal=false
+Categories=Settings;Utility;
+StartupWMClass=io.github.longer54.CosmicWidgetsManager

@@ -1,6 +1,7 @@
 //! Podpięcie vaulta Obsidiana: walidacja folderu i zapis do configów widżetów.
 
 use crate::catalog::{WIDGETS, config_path};
+use crate::i18n::t;
 use std::fs;
 use std::path::Path;
 use toml_edit::{DocumentMut, value};
@@ -14,7 +15,7 @@ pub fn is_vault(p: &Path) -> bool {
 /// Reszta pliku (komentarze, inne klucze) zostaje nietknięta. Zwraca liczbę zmienionych configów.
 pub fn apply_vault(p: &Path) -> Result<usize, String> {
     if !is_vault(p) {
-        return Err(format!("{} nie wygląda na vault Obsidiana (brak folderu .obsidian)", p.display()));
+        return Err(format!("{} {}", p.display(), t("nie wygląda na vault Obsidiana (brak folderu .obsidian)", "does not look like an Obsidian vault (no .obsidian folder)")));
     }
     let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     let mut n = 0;
@@ -46,6 +47,7 @@ mod tests {
 
     #[test]
     fn zapisuje_vault_i_zachowuje_reszte() {
+        let _g = crate::catalog::ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let base = std::env::temp_dir().join(format!("cwm-test-{}", std::process::id()));
         let vault = base.join("MojVault");
         fs::create_dir_all(vault.join(".obsidian")).unwrap();

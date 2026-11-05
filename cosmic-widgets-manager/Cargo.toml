@@ -1,6 +1,6 @@
 [package]
 name = "cosmic-widgets-manager"
-version = "0.1.0"
+version = "0.2.0"
 description = "GUI to enable, configure and autostart the COSMIC desktop widgets, and to plug in an Obsidian vault"
 edition = "2024"
 rust-version = "1.85"
@@ -17,3 +17,19 @@ cosmic = { package = "libcosmic", git = "https://github.com/pop-os/libcosmic", d
 ] }
 toml_edit = "0.22"
 dirs = "5"
+png = "0.17"
+
+[package.metadata.deb]
+maintainer = "longer54 <longer54@users.noreply.github.com>"
+copyright = "longer54, GPL-3.0-or-later"
+license-file = ["../LICENSE", "0"]
+section = "utils"
+priority = "optional"
+depends = "libxkbcommon0, libwayland-client0, libc6"
+extended-description = "GUI to enable, configure and autostart the COSMIC desktop widgets, and to plug in an Obsidian vault. Requires COSMIC (cosmic-comp >= 1.0)."
+assets = [
+    ["target/release/cosmic-widgets-manager", "usr/bin/", "755"],
+    ["io.github.longer54.CosmicWidgetsManager.desktop", "usr/share/applications/", "644"],
+    ["README.md", "usr/share/doc/cosmic-widgets-manager/README.md", "644"],
+    ["README.pl.md", "usr/share/doc/cosmic-widgets-manager/README.pl.md", "644"],
+]

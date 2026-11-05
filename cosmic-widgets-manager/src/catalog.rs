@@ -1,27 +1,39 @@
 //! Lista widżetów z repo + operacje: status, start/stop, autostart.
 
+use crate::i18n::t;
 use std::fs;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 pub struct WidgetDef {
-    pub label: &'static str,
-    pub desc: &'static str,
+    pub label_pl: &'static str,
+    pub label_en: &'static str,
+    pub desc_pl: &'static str,
+    pub desc_en: &'static str,
     /// Nazwa binarki (= nazwa katalogu w ~/.config/<bin>/).
     pub bin: &'static str,
     /// Czy widżet czyta vault Obsidiana (ma `vault_path` w config.toml).
     pub vault: bool,
 }
 
+impl WidgetDef {
+    pub fn label(&self) -> &'static str { t(self.label_pl, self.label_en) }
+    pub fn desc(&self) -> &'static str { t(self.desc_pl, self.desc_en) }
+}
+
+const fn w(label_pl: &'static str, label_en: &'static str, desc_pl: &'static str, desc_en: &'static str, bin: &'static str, vault: bool) -> WidgetDef {
+    WidgetDef { label_pl, label_en, desc_pl, desc_en, bin, vault }
+}
+
 pub const WIDGETS: &[WidgetDef] = &[
-    WidgetDef { label: "Kalendarz Obsidiana", desc: "Kalendarz notatek dziennych, klik otwiera lub tworzy notatkę dnia", bin: "cosmic-calendar-widget", vault: true },
-    WidgetDef { label: "Zadania", desc: "Zaległe i dzisiejsze zadania (wtyczka Tasks)", bin: "cosmic-widget-tasks", vault: true },
-    WidgetDef { label: "Notatka", desc: "Karteczka na pulpicie zapisana jako plik .md w vaulcie", bin: "cosmic-widget-note", vault: true },
-    WidgetDef { label: "Szuflady", desc: "Wysuwane szuflady: widżety i drzewo vaulta", bin: "cosmic-widget-drawer", vault: true },
-    WidgetDef { label: "Agenda", desc: "Nadchodzące wydarzenia z Kalendarza Google (prywatny ICS)", bin: "cosmic-widget-agenda", vault: false },
-    WidgetDef { label: "Pogoda", desc: "Aktualna pogoda i krótka prognoza", bin: "cosmic-widget-weather", vault: false },
-    WidgetDef { label: "Rynki", desc: "Ceny aktywów i wykresy", bin: "cosmic-widget-markets", vault: false },
-    WidgetDef { label: "Panel usług", desc: "Status własnych usług z Twojego endpointu JSON", bin: "cosmic-widget-panel", vault: false },
+    w("Kalendarz Obsidiana", "Obsidian calendar", "Kalendarz notatek dziennych, klik otwiera lub tworzy notatkę dnia", "Daily-notes calendar; a click opens or creates the day's note", "cosmic-calendar-widget", true),
+    w("Zadania", "Tasks", "Zaległe i dzisiejsze zadania (wtyczka Tasks)", "Overdue and today's tasks (Tasks plugin)", "cosmic-widget-tasks", true),
+    w("Notatka", "Note", "Karteczka na pulpicie zapisana jako plik .md w vaulcie", "A desktop sticky note saved as an .md file in the vault", "cosmic-widget-note", true),
+    w("Szuflady", "Drawers", "Wysuwane szuflady: widżety i drzewo vaulta", "Slide-out drawers: widgets and the vault tree", "cosmic-widget-drawer", true),
+    w("Agenda", "Agenda", "Nadchodzące wydarzenia z Kalendarza Google (prywatny ICS)", "Upcoming events from Google Calendar (private ICS)", "cosmic-widget-agenda", false),
+    w("Pogoda", "Weather", "Aktualna pogoda i krótka prognoza", "Current weather and a short forecast", "cosmic-widget-weather", false),
+    w("Rynki", "Markets", "Ceny aktywów i wykresy", "Asset prices and charts", "cosmic-widget-markets", false),
+    w("Panel usług", "Services panel", "Status własnych usług z Twojego endpointu JSON", "Status of your own services from a JSON endpoint", "cosmic-widget-panel", false),
 ];
 
 pub fn config_path(bin: &str) -> PathBuf {
@@ -66,14 +78,14 @@ pub fn is_running(bin: &str) -> bool {
 }
 
 pub fn start(bin: &str) -> Result<(), String> {
-    let path = binary_path(bin).ok_or_else(|| format!("nie znalazłem {bin} w ~/.local/bin ani w PATH"))?;
+    let path = binary_path(bin).ok_or_else(|| format!("{} {bin} ~/.local/bin / PATH", t("nie znalazłem", "not found:")))?;
     Command::new(path)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
         .map(|_| ())
-        .map_err(|e| format!("start {bin}: {e}"))
+        .map_err(|e| format!("{} {bin}: {e}", t("start", "start")))
 }
 
 pub fn stop(bin: &str) {
@@ -92,7 +104,7 @@ pub fn set_autostart(def: &WidgetDef, on: bool) -> Result<(), String> {
         fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
         let body = format!(
             "[Desktop Entry]\nType=Application\nName={}\nExec={}\nTerminal=false\nX-GNOME-Autostart-enabled=true\n",
-            def.label, def.bin
+            def.label(), def.bin
         );
         fs::write(&path, body).map_err(|e| e.to_string())
     } else if path.exists() {
@@ -101,3 +113,7 @@ pub fn set_autostart(def: &WidgetDef, on: bool) -> Result<(), String> {
         Ok(())
     }
 }
+
+/// Blokada dla testów, które ustawiają XDG_CONFIG_HOME (zmienna procesu).
+#[cfg(test)]
+pub static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
