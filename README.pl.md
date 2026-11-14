@@ -68,6 +68,13 @@ Wszystkie widgety mają te same pola konfiguracji `anchor` (`top-left` / `top-ri
 - **Widget nie dopasowuje rozmiaru do treści / treść jest ucięta na dole**: szacowanie wysokości w `app.rs` danego widgetu zaniża rzeczywistą wysokość wiersza. Zwiększ stałą pikseli na wiersz w `estimated_height()` — lepiej dać za dużo (trochę pustego miejsca) niż uciąć treść, bo powierzchnie layer-shell się nie przewijają.
 - **Program zbudowany na jednym komputerze nie działa na innym**: `target/` zależy od architektury i toolchainu i nie służy do kopiowania między maszynami — przebuduj `cargo build --release` na każdej z nich.
 
+## Inne aplikacje tego autora
+
+Natywne aplikacje na Linuksa w Rust + Qt 6/QML, w tym samym duchu co widżety (szybkie, lokalne, bez telemetrii):
+
+- **[Kronoa](https://github.com/longer54/kronoa)** — kalendarz: Google Calendar (w obie strony), CalDAV, ICS i szybkie dodawanie zwykłym zdaniem po polsku lub angielsku (`spotkanie jutro 14:00 1h co tydzień`).
+- **[Kula](https://github.com/longer54/kula)** — szybka, lokalna oś czasu zdjęć (jak Zdjęcia Google), zdjęcia nie opuszczają dysku.
+
 ## Licencja
 
 GPL-3.0-or-later — zob. [LICENSE](LICENSE).

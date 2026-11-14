@@ -68,6 +68,13 @@ All widgets share the same `anchor` (`top-left` / `top-right` / `bottom-left` / 
 - **Widget never resizes to fit its content / content looks clipped at the bottom**: the estimated-height calculation in that widget's `app.rs` is under-counting real row height. Increase the per-row pixel constant in `estimated_height()` — better to over-provision (extra blank space) than clip content, since layer-shell surfaces don't scroll.
 - **Binary built on one machine doesn't run on another**: `target/` is architecture/toolchain-specific and isn't meant to be copied between machines — rebuild with `cargo build --release` on each one.
 
+## More apps by the same author
+
+Native Linux desktop apps in Rust + Qt 6/QML, same spirit as these widgets (fast, local, no telemetry):
+
+- **[Kronoa](https://github.com/longer54/kronoa)** — desktop calendar: Google Calendar (two-way), CalDAV, ICS, and quick add in plain English/Polish (`meeting tomorrow 2pm 1h weekly`).
+- **[Kula](https://github.com/longer54/kula)** — fast local photo timeline (Google Photos-style), your photos never leave your disk.
+
 ## Po polsku
 
 Polska wersja tego README: [README.pl.md](README.pl.md). Subprojects with a Polish version have their own `README.pl.md`.
